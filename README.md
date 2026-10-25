@@ -3,7 +3,7 @@
 > **Predictive Failure Analysis • Intelligent Recovery • Real-Time System Health Monitoring**  
 > *A modular user-space self-healing autonomic framework designed for academic demonstration and systems research.*  
 > *Target Environment: Ubuntu on WSL (`/mnt/e/HealOs`) / Linux / Windows*  
-> 📖 **Teacher Demonstration Guide:** See [`TEACHER_DEMO_GUIDE.md`](file:///e:/HealOs/TEACHER_DEMO_GUIDE.md) for feature-by-feature demonstration instructions, spoken scripts, exact terminal commands, and verification proofs.
+> 📖 ** Demonstration Guide:** See [`TEACHER_DEMO_GUIDE.md`](file:///e:/HealOs/TEACHER_DEMO_GUIDE.md) for feature-by-feature demonstration instructions, spoken scripts, exact terminal commands, and verification proofs.
 
 ---
 
