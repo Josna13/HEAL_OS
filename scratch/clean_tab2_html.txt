@@ -1,0 +1,184 @@
+<!-- ===================================================================== -->
+  <!-- TAB 2: CPU SCHEDULING VISUALIZER (PRACTICAL & ANIMATED) -->
+  <!-- ===================================================================== -->
+  <main id="tab-process-lab" style="display:none;">
+    <!-- Subtitle satisfying OS Process Lifecycle requirement -->
+    <div class="panel-box" style="padding:10px 14px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div>
+          <div style="font-size:1.05rem; font-weight:900; color:var(--accent-cyan); display:flex; align-items:center; gap:8px;">
+            <span>⚡ CPU Scheduling & OS Process Lifecycle Visualizer</span>
+            <span class="badge badge-cyan" id="sch-algo-pill">RR (Q=2)</span>
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+            Interactive process dispatch animation: Watch jobs move from Ready Queue into Core 0, track remaining burst, preemption, and completion.
+          </div>
+        </div>
+
+        <!-- Algorithm Buttons -->
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-sm" id="btn-algo-FCFS" onclick="setAlgorithm('FCFS')">FCFS</button>
+          <button class="btn btn-sm" id="btn-algo-SJF" onclick="setAlgorithm('SJF')">SJF</button>
+          <button class="btn btn-sm btn-cyan" id="btn-algo-RR" onclick="setAlgorithm('RR')">Round Robin</button>
+          <button class="btn btn-sm" id="btn-algo-PRIORITY" onclick="setAlgorithm('PRIORITY')">Priority</button>
+
+          <!-- Quantum Input (for RR) -->
+          <div id="rr-quantum-wrap" style="display:inline-flex; align-items:center; gap:4px; margin-left:4px;">
+            <span style="font-size:0.7rem; color:var(--text-muted); font-weight:bold;">q =</span>
+            <input type="number" id="input-quantum" min="1" max="10" value="2" style="width:42px; background:#020617; border:1px solid var(--border); color:#fff; border-radius:4px; padding:2px 4px; text-align:center; font-weight:bold; font-size:0.75rem;" onchange="updateQuantum(this.value)">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Playback & Clock Controls Bar -->
+    <div class="panel-box" style="padding:8px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="btn btn-sm btn-green" id="btn-sch-play" onclick="schTogglePlay()">▶ Play</button>
+        <button class="btn btn-sm" onclick="schStep(1)">Step ▶</button>
+        <button class="btn btn-sm" onclick="schResetTick()">↺ Reset</button>
+
+        <!-- Speed Selector -->
+        <span style="font-size:0.72rem; color:var(--text-muted); margin-left:8px; font-weight:bold;">Speed:</span>
+        <button class="btn btn-sm" id="btn-spd-05" onclick="setSchSpeed(1600, '05')">0.5×</button>
+        <button class="btn btn-sm btn-cyan" id="btn-spd-1" onclick="setSchSpeed(800, '1')">1×</button>
+        <button class="btn btn-sm" id="btn-spd-2" onclick="setSchSpeed(400, '2')">2×</button>
+        <button class="btn btn-sm" id="btn-spd-4" onclick="setSchSpeed(200, '4')">4×</button>
+      </div>
+
+      <!-- Clock & Status -->
+      <div style="display:flex; align-items:center; gap:12px; font-family:var(--font-mono);">
+        <div>
+          <span style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase;">SIMULATED CLOCK:</span>
+          <span id="sch-clock-text" style="font-size:1.1rem; font-weight:900; color:var(--accent-cyan); margin-left:4px;">t = 0</span>
+        </div>
+        <span class="badge badge-gray" id="sch-state-badge">○ PAUSED</span>
+      </div>
+    </div>
+
+    <!-- 3-Stage Visual Pipeline: READY QUEUE -> CPU CORE -> COMPLETED -->
+    <div class="stage-grid">
+      <!-- 1. Ready Queue -->
+      <div class="stage-card">
+        <div class="stage-title">
+          <span>1. READY QUEUE</span>
+          <span class="badge badge-cyan" id="sch-rq-count">0 queued</span>
+        </div>
+        <div id="sch-ready-list" class="queue-token-list">
+          <span style="color:#64748b; font-size:0.72rem;">No processes currently waiting in ready queue.</span>
+        </div>
+      </div>
+
+      <!-- 2. CPU Core 0 Socket -->
+      <div class="stage-card">
+        <div class="stage-title">
+          <span>2. CPU CORE 0 (EXECUTING)</span>
+          <span class="badge badge-gray" id="cpu-pill">IDLE</span>
+        </div>
+        <div class="cpu-socket idle" id="cpu-socket-box">
+          <div style="font-size:0.68rem; color:var(--text-dim); font-weight:bold; letter-spacing:1px; margin-bottom:2px;">CORE 0 SOCKET</div>
+          <div id="cpu-job-label" style="font-size:1.35rem; font-weight:900; color:#fff; font-family:var(--font-mono); margin-bottom:2px;">CPU IDLE</div>
+          <div id="cpu-burst-countdown" style="font-size:0.78rem; color:#67e8f9; font-weight:bold; margin-bottom:6px;">No Job Dispatched</div>
+          <div class="progress-track" style="width:100%; max-width:180px; height:8px;">
+            <div id="cpu-progress-bar" class="progress-fill" style="width:0%; background:var(--accent-green);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Completed Processes -->
+      <div class="stage-card">
+        <div class="stage-title">
+          <span>3. COMPLETED JOBS</span>
+          <span class="badge badge-green" id="sch-comp-count">0 finished</span>
+        </div>
+        <div id="sch-completed-list" class="queue-token-list">
+          <span style="color:#64748b; font-size:0.72rem;">Completed processes will appear here.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Animated Gantt Chart Timeline -->
+    <div class="panel-box" style="margin-bottom:12px;">
+      <div class="panel-header" style="margin-bottom:8px;">
+        <div class="panel-heading">
+          <span>Animated Gantt Chart Timeline</span>
+          <span class="badge badge-cyan">[EXECUTION TRACE]</span>
+        </div>
+        <div style="font-size:0.7rem; color:var(--text-muted);">Red indicator marks the current clock tick (t)</div>
+      </div>
+
+      <div class="gantt-wrap">
+        <div id="gantt-ruler" class="gantt-ruler"></div>
+        <div style="position:relative;">
+          <div id="gantt-track" class="gantt-track"></div>
+          <div id="gantt-cursor" class="gantt-cursor" style="left:0%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Process Input Studio & Results Table (2 Columns) -->
+    <div style="display:grid; grid-template-columns: 1fr 1.25fr; gap:12px;">
+      <!-- Process Input Form -->
+      <div class="panel-box" style="margin-bottom:0;">
+        <div class="panel-header" style="margin-bottom:8px;">
+          <div class="panel-heading">
+            <span>Process Input Studio</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-sm btn-cyan" onclick="addProcessRow()">➕ Add</button>
+            <button class="btn btn-sm" onclick="resetCurrentDataset()">↺ Reset</button>
+            <button class="btn btn-sm btn-green" onclick="applyCustomProcesses()">▶ Apply</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="clean-table">
+            <thead>
+              <tr>
+                <th>PID / Label</th>
+                <th>Arrival (AT)</th>
+                <th>Burst (BT)</th>
+                <th>Priority</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="sch-input-tbody"></tbody>
+          </table>
+        </div>
+        <div id="input-error-msg" style="display:none; color:#fca5a5; background:#7f1d1d; border-radius:4px; padding:4px 8px; font-size:0.72rem; margin-top:6px;"></div>
+      </div>
+
+      <!-- Scheduling Results Table -->
+      <div class="panel-box" style="margin-bottom:0;">
+        <div class="panel-header" style="margin-bottom:8px;">
+          <div class="panel-heading">
+            <span>Scheduling Results & Metrics</span>
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-muted);" id="sch-results-summary">Awaiting simulation run</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="clean-table">
+            <thead>
+              <tr>
+                <th>Process</th>
+                <th>Arrival</th>
+                <th>Burst</th>
+                <th>Priority</th>
+                <th>Completion (CT)</th>
+                <th>Turnaround (TAT)</th>
+                <th>Waiting (WT)</th>
+              </tr>
+            </thead>
+            <tbody id="sch-results-tbody"></tbody>
+            <tfoot>
+              <tr style="font-weight:bold; border-top:2px solid var(--border); color:#38bdf8;">
+                <td colspan="4">Averages</td>
+                <td id="avg-ct">-</td>
+                <td id="avg-tat" style="color:#22c55e;">0.0t</td>
+                <td id="avg-wt" style="color:#22d3ee;">0.0t</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>

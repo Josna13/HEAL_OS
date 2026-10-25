@@ -1,0 +1,400 @@
+4478:         try:
+4479:             self._do_GET_impl()
+4480:         except (BrokenPipeError, ConnectionResetError):
+4481:             pass
+4482: 
+4483:     def _do_GET_impl(self):
+4484:         parsed = urlparse(self.path)
+4485:         if parsed.path in ("/", "/index.html"):
+4486:             self.send_response(200)
+4487:             self.send_header("Content-Type", "text/html; charset=utf-8")
+4488:             self.end_headers()
+4489:             self.wfile.write(HTML_PAGE.encode("utf-8"))
+4490:         elif parsed.path == "/api/status":
+4491:             self.send_response(200)
+4492:             self.send_header("Content-Type", "application/json")
+4493:             self.end_headers()
+4494: 
+4495:             # 1. Lifecycle
+4496:             lc_summary = self.lifecycle_engine.get_summary()
+4497: 
+4498:             # 2. Scheduler
+4499:             if self.scheduler_algo == "FCFS":
+4500:                 sch_res = CPUScheduler.run_fcfs(self.scheduler_procs)
+4501:             elif self.scheduler_algo == "SJF":
+4502:                 sch_res = CPUScheduler.run_sjf(self.scheduler_procs)
+4503:             elif self.scheduler_algo == "PRIORITY":
+4504:                 sch_res = CPUScheduler.run_priority(self.scheduler_procs)
+4505:             else:
+4506:                 sch_res = CPUScheduler.run_round_robin(self.scheduler_procs, time_quantum=self.scheduler_quantum)
+4507: 
+4508:             sch_comp = CPUScheduler.compare_all(self.scheduler_procs, quantum=self.scheduler_quantum)
+4509:             sch_dict = sch_res.to_dict()
+4510:             sch_dict["timeline_ticks"] = [sch_res.get_timeline_at_tick(t) for t in range(sch_res.total_duration + 1)]
+4511:             sch_dict["raw_processes"] = [p.to_dict() for p in self.scheduler_procs]
+4512:             sch_dict["algorithm"] = self.scheduler_algo
+4513:             sch_dict["quantum"] = self.scheduler_quantum
+4514:             sch_dict["example_datasets"] = CPUScheduler.get_example_datasets()
+4515: 
+4516:             # 3. Deadlock
+4517:             is_safe, safe_seq, trace = self.banker.is_safe_state()
+4518:             seq_str = " -> ".join([f"P{p}" for p in safe_seq]) if is_safe else "None"
+4519: 
+4520:             deadlock_data = {
+4521:                 "scenario_key": self.deadlock_scenario_key,
+4522:                 "two_process": self.two_proc_deadlock.get_state(),
+4523:                 "banker": {
+4524:                     "is_safe": is_safe,
+4525:                     "safe_sequence": seq_str,
+4526:                     "allocation": self.banker.allocation,
+4527:                     "max_matrix": self.banker.max_matrix,
+4528:                     "need": self.banker.need,
+4529:                     "available": self.banker.available,
+4530:                     "trace": self.banker_trace_msg,
+4531:                     "safety_steps": self.banker.get_safety_steps(),
+4532:                 }
+4533:             }
+4534: 
+4535:             # 4. PID Comparison
+4536:             comp = CrashRecoveryComparison()
+4537:             if self.orchestrator_ref and hasattr(self.orchestrator_ref, "state"):
+4538:                 comp.sync_from_app_state(self.orchestrator_ref.state)
+4539:             else:
+4540:                 st = self.standalone_state
+4541:                 comp.has_recovery_occurred = st["total_crashes"] > 0
+4542:                 if comp.has_recovery_occurred:
+4543:                     comp.original_process = ProcessIdentityRecord(
+4544:                         pid=st["failed_pid"],
+4545:                         name="dummy_app.py",
+4546:                         start_time_str="Previous Session",
+4547:                         end_time_str=st["last_crash_time"],
+4548:                         state="TERMINATED / CRASHED",
+4549:                         runtime_sec=0.0,
+4550:                     )
+4551:                     comp.replacement_process = ProcessIdentityRecord(
+4552:                         pid=st["app_pid"],
+4553:                         name="dummy_app.py",
+4554:                         start_time_str=st["last_crash_time"],
+4555:                         end_time_str=None,
+4556:                         state="RUNNING (ACTIVE)",
+4557:                         runtime_sec=st["app_uptime"],
+4558:                         cpu_percent=1.2,
+4559:                         memory_mb=18.4,
+4560:                     )
+4561:                     comp.is_replacement_alive = True
+4562:                     comp.recovery_duration_ms = 1080.0
+4563:                     comp.recovery_duration_sec = 1.08
+4564:                     comp.recovery_status = "SUCCESS"
+4565:                     comp.sla_met = True
+4566:                     comp.crash_detected_at = st["last_crash_time"]
+4567:                     comp.recovery_completed_at = st["last_crash_time"]
+4568:                 else:
+4569:                     comp.original_process = ProcessIdentityRecord(
+4570:                         pid=st["app_pid"],
+4571:                         name="dummy_app.py",
+4572:                         start_time_str="Just started",
+4573:                         end_time_str=None,
+4574:                         state="RUNNING (NOMINAL)",
+4575:                         runtime_sec=st["app_uptime"],
+4576:                         cpu_percent=1.2,
+4577:                         memory_mb=18.4,
+4578:                     )
+4579:             pid_data = comp.get_comparison_table_data()
+4580: 
+4581:             # 5. Seven Panel Overview Telemetry (Directly from AppState or Nominal Baseline)
+4582:             ov = {}
+4583:             if self.orchestrator_ref and hasattr(self.orchestrator_ref, "state"):
+4584:                 s = self.orchestrator_ref.state
+4585:                 with s._lock:
+4586:                     ov = {
+4587:                         "cpu_percent": s.cpu_percent,
+4588:                         "ram_percent": s.ram_percent,
+4589:                         "disk_percent": s.disk_percent,
+4590:                         "process_count": s.process_count,
+4591:                         "cpu_change": s.cpu_change,
+4592:                         "ram_change": s.ram_change,
+4593:                         "ram_used_mb": s.ram_used_mb,
+4594:                         "ram_total_mb": s.ram_total_mb,
+4595:                         "ram_free_mb": s.ram_free_mb,
+4596:                         "disk_used_gb": s.disk_used_gb,
+4597:                         "disk_total_gb": s.disk_total_gb,
+4598:                         "disk_free_gb": s.disk_free_gb,
+4599:                         "cpu_history": list(s.cpu_history),
+4600:                         "ram_history": list(s.ram_history),
+4601:                         "app_name": s.app_name,
+4602:                         "app_pid": s.app_pid,
+4603:                         "app_is_running": s.app_is_running,
+4604:                         "app_uptime": s.app_uptime,
+4605:                         "app_cpu_percent": s.app_cpu_percent,
+4606:                         "app_memory_percent": s.app_memory_percent,
+4607:                         "app_memory_mb": s.app_memory_mb,
+4608:                         "failed_pid": s.failed_pid,
+4609:                         "last_crash_time": s.last_crash_time,
+4610:                         "last_failure_reason": s.last_failure_reason,
+4611:                         "total_crashes": s.total_crashes,
+4612:                         "risk_probability": round(float(s.risk_probability) if s.risk_probability > 1.0 else (float(s.risk_probability) * 100.0), 1),
+4613:                         "risk_category": s.risk_category,
+4614:                         "prediction_timestamp": s.prediction_timestamp,
+4615:                         "model_loaded": s.model_loaded,
+4616:                         "warning_signals": s.warning_signals,
+4617:                         "warning_summary": s.warning_summary,
+4618:                         "prediction_recommendation": s.prediction_recommendation,
+4619:                         "risk_history": list(s.risk_history),
+4620:                         "decision_action": s.decision_action,
+4621:                         "decision_reason": s.decision_reason,
+4622:                         "decision_score": s.decision_score,
+4623:                         "decision_alternatives": s.decision_alternatives,
+4624:                         "health_overall": s.health_overall,
+4625:                         "health_cpu": s.health_cpu,
+4626:                         "health_ram": s.health_ram,
+4627:                         "health_disk": s.health_disk,
+4628:                         "health_stability": s.health_stability,
+4629:                         "health_risk_category": s.health_risk_category,
+4630:                         "health_recommendation": s.health_recommendation,
+4631:                         "health_primary_degraded_metric": s.health_primary_degraded_metric,
+4632:                         "health_history": list(s.health_history),
+4633:                         "recovery_state": s.recovery_state,
+4634:                         "total_restarts": s.total_restarts,
+4635:                         "successful_recoveries": s.successful_recoveries,
+4636:                         "failed_recoveries": s.failed_recoveries,
+4637:                         "recovery_success_rate": s.recovery_success_rate,
+4638:                         "last_recovery_duration": s.last_recovery_duration,
+4639:                         "sla_target_sec": s.sla_target_sec,
+4640:                         "sla_compliance_rate": s.sla_compliance_rate,
+4641:                         "recovery_durations": s.recovery_durations,
+4642:                         "recent_recoveries": s.recent_recoveries,
+4643:                         "module_status": s.module_status,
+4644:                         "events": list(s.events),
+4645:                     }
+4646:             else:
+4647:                 # Standalone test/nominal fallback
+4648:                 st = self.standalone_state
+4649:                 ov = {
+4650:                     "cpu_percent": 18.5,
+4651:                     "ram_percent": 42.0,
+4652:                     "disk_percent": 28.0,
+4653:                     "process_count": 142,
+4654:                     "cpu_change": 0.5,
+4655:                     "ram_change": 0.0,
+4656:                     "ram_used_mb": 4096.0,
+4657:                     "ram_total_mb": 16384.0,
+4658:                     "ram_free_mb": 12288.0,
+4659:                     "disk_used_gb": 120.0,
+4660:                     "disk_total_gb": 512.0,
+4661:                     "disk_free_gb": 392.0,
+4662:                     "cpu_history": [{"timestamp": "12:00:00", "value": 15.0}, {"timestamp": "12:00:05", "value": 18.5}],
+4663:                     "ram_history": [{"timestamp": "12:00:00", "value": 41.5}, {"timestamp": "12:00:05", "value": 42.0}],
+4664:                     "app_name": "dummy_app.py",
+4665:                     "app_pid": st["app_pid"],
+4666:                     "app_is_running": st["app_is_running"],
+4667:                     "app_uptime": st["app_uptime"],
+4668:                     "app_cpu_percent": 1.2,
+4669:                     "app_memory_percent": 0.8,
+4670:                     "app_memory_mb": 18.4,
+4671:                     "failed_pid": st["failed_pid"],
+4672:                     "last_crash_time": st["last_crash_time"],
+4673:                     "last_failure_reason": "Fatal trigger exit (SIGSEGV simulated)" if st["total_crashes"] > 0 else "None recorded",
+4674:                     "total_crashes": st["total_crashes"],
+4675:                     "risk_probability": 8.0,
+4676:                     "risk_category": "LOW",
+4677:                     "prediction_timestamp": datetime.now().strftime("%H:%M:%S"),
+4678:                     "model_loaded": True,
+4679:                     "warning_signals": [],
+4680:                     "warning_summary": "None (telemetry nominal)",
+4681:                     "prediction_recommendation": "Operating metrics nominal.",
+4682:                     "risk_history": [{"timestamp": "12:00:00", "value": 8.0, "category": "LOW"}],
+4683:                     "decision_action": "MONITOR" if st["total_crashes"] == 0 else "RESTART_APPLICATION",
+4684:                     "decision_reason": "System telemetry nominal. Surveillance active." if st["total_crashes"] == 0 else "Application terminated with exit code 1; host nominal.",
+4685:                     "decision_score": 0.96,
+4686:                     "decision_alternatives": ["INVESTIGATE"],
+4687:                     "health_overall": 98.5 if st["total_crashes"] == 0 else 92.0,
+4688:                     "health_cpu": 100.0,
+4689:                     "health_ram": 100.0,
+4690:                     "health_disk": 100.0,
+4691:                     "health_stability": 100.0 if st["total_crashes"] == 0 else 80.0,
+4692:                     "health_risk_category": "HEALTHY",
+4693:                     "health_recommendation": "All subsystems operational.",
+4694:                     "health_primary_degraded_metric": "None (All Nominal)",
+4695:                     "health_history": [{"timestamp": "12:00:00", "value": 98.5, "category": "HEALTHY"}],
+4696:                     "recovery_state": "IDLE (Normal Monitoring)" if st["total_crashes"] == 0 else f"RECOVERED (PID {st['app_pid']})",
+4697:                     "total_restarts": st["total_crashes"],
+4698:                     "successful_recoveries": st["total_crashes"],
+4699:                     "failed_recoveries": 0,
+4700:                     "recovery_success_rate": 100.0,
+4701:                     "last_recovery_duration": st["last_recovery_duration"],
+4702:                     "sla_target_sec": 2.5,
+4703:                     "sla_compliance_rate": 100.0,
+4704:                     "recovery_durations": [{"attempt": i + 1, "duration_ms": 1080.0, "duration_sec": 1.08, "status": "SUCCESS", "sla_met": True, "timestamp": r["timestamp"]} for i, r in enumerate(st["recent_recoveries"])],
+4705:                     "recent_recoveries": st["recent_recoveries"],
+4706:                     "module_status": {
+4707:                         "System Monitor": "ONLINE",
+4708:                         "Process Monitor": "ONLINE",
+4709:                         "AI Predictor": "ONLINE",
+4710:                         "Health Analyzer": "ONLINE",
+4711:                         "Crash Detector": "ONLINE",
+4712:                         "Decision Engine": "ONLINE",
+4713:                         "Recovery Daemon": "ONLINE",
+4714:                         "Logger": "ONLINE",
+4715:                     },
+4716:                     "events": st["events"],
+4717:                 }
+4718: 
+4719:             resp = {
+4720:                 "lifecycle": lc_summary,
+4721:                 "scheduler": sch_dict,
+4722:                 "scheduler_comparison": sch_comp,
+4723:                 "deadlock": deadlock_data,
+4724:                 "pid_comparison": pid_data,
+4725:                 "timeline": self.timeline_events,
+4726:                 "overview": ov,
+4727:             }
+4728:             self.wfile.write(json.dumps(resp).encode("utf-8"))
+4729:         else:
+4730:             self.send_error(404, "Endpoint Not Found")
+4731: 
+4732:     def do_POST(self):
+4733:         try:
+4734:             self._do_POST_impl()
+4735:         except (BrokenPipeError, ConnectionResetError):
+4736:             pass
+4737: 
+4738:     def _do_POST_impl(self):
+4739:         parsed = urlparse(self.path)
+4740:         if parsed.path == "/api/action":
+4741:             content_length = int(self.headers.get("Content-Length", 0))
+4742:             body = self.rfile.read(content_length)
+4743:             try:
+4744:                 data = json.loads(body.decode("utf-8"))
+4745:             except Exception:
+4746:                 data = {}
+4747: 
+4748:             action = data.get("action")
+4749:             if action in ("step_lifecycle", "step_lifecycle_tick"):
+4750:                 res = self.lifecycle_engine.step_tick()
+4751:                 msg = res.get("message", f"Simulation advanced to clock T={self.lifecycle_engine.clock_tick}") if isinstance(res, dict) else str(res)
+4752:                 self.record_event("LIFECYCLE_TICK", None, msg, "[SIMULATION]")
+4753:             elif action == "step_lifecycle_event":
+4754:                 res = self.lifecycle_engine.step_event()
+4755:                 self.record_event("LIFECYCLE_EVENT", None, f"Advanced to event boundary at clock T={self.lifecycle_engine.clock_tick}", "[SIMULATION]")
+4756:             elif action in ("reset_lifecycle", "restart_lifecycle"):
+4757:                 self.lifecycle_engine.reset()
+4758:                 self.record_event("LIFECYCLE_RESET", None, "Process lifecycle state machine reset to T=0.", "[SIMULATION]")
+4759:             elif action == "select_pcb":
+4760:                 pid_val = data.get("pid")
+4761:                 if pid_val is not None:
+4762:                     try:
+4763:                         self.lifecycle_engine.selected_pid = int(pid_val)
+4764:                     except Exception:
+4765:                         pass
+4766:             elif action == "set_lifecycle_algo":
+4767:                 algo = str(data.get("algo", "RR"))
+4768:                 q = int(data.get("quantum", 2))
+4769:                 preempt = bool(data.get("preemptive", False))
+4770:                 self.lifecycle_engine.set_algorithm(algo, time_quantum=q, priority_preemptive=preempt)
+4771:                 self.record_event("LIFECYCLE_POLICY", None, f"Lifecycle scheduler policy changed to {algo} (q={q}, preemptive={preempt}).", "[SIMULATION]")
+4772:             elif action == "add_lifecycle_process":
+4773:                 name = str(data.get("name", "custom_job")).strip()
+4774:                 at = max(0, int(data.get("arrival_time", 0)))
+4775:                 bt = max(1, int(data.get("cpu_burst", 4)))
+4776:                 prio = max(1, int(data.get("priority", 1)))
+4777:                 ioreq = data.get("io_request_time")
+4778:                 if ioreq is not None and int(ioreq) > 0:
+4779:                     ioreq = int(ioreq)
+4780:                 else:
+4781:                     ioreq = None
+4782:                 iodur = max(0, int(data.get("io_duration", 0)))
+4783:                 new_proc = self.lifecycle_engine.add_process(
+4784:                     name=name,
+4785:                     arrival_time=at,
+4786:                     cpu_burst=bt,
+4787:                     priority=prio,
+4788:                     io_request_time=ioreq,
+4789:                     io_duration=iodur,
+4790:                 )
+4791:                 self.record_event("LIFECYCLE_PROC_ADD", new_proc.pid, f"Allocated simulated PID P{new_proc.pid} for '{new_proc.name}' [SIMULATED PID].", "[SIMULATION]")
+4792:                 self.send_response(200)
+4793:                 self.send_header("Content-Type", "application/json")
+4794:                 self.end_headers()
+4795:                 self.wfile.write(json.dumps({"status": "ok", "pid": new_proc.pid}).encode("utf-8"))
+4796:                 return
+4797:             elif action == "remove_lifecycle_process":
+4798:                 pid_val = int(data.get("pid", 0))
+4799:                 removed = self.lifecycle_engine.remove_process(pid_val)
+4800:                 if removed:
+4801:                     self.record_event("LIFECYCLE_PROC_DEL", pid_val, f"Removed simulated process P{pid_val} from simulation manifest.", "[SIMULATION]")
+4802:                 self.send_response(200)
+4803:                 self.send_header("Content-Type", "application/json")
+4804:                 self.end_headers()
+4805:                 self.wfile.write(json.dumps({"status": "ok", "removed": removed}).encode("utf-8"))
+4806:                 return
+4807:             elif action == "load_lifecycle_preset":
+4808:                 preset_key = str(data.get("preset", "full_lifecycle_io"))
+4809:                 self.lifecycle_engine.load_preset(preset_key)
+4810:                 self.record_event("LIFECYCLE_PRESET", None, f"Loaded lifecycle scenario preset: {preset_key}.", "[SIMULATION]")
+4811:             elif action == "set_scheduler_algo":
+4812:                 self.__class__.scheduler_algo = data.get("algo", "RR")
+4813:                 self.record_event("SCHEDULER_POLICY", None, f"Scheduler algorithm set to {self.__class__.scheduler_algo}.", "[SIMULATION]")
+4814:             elif action == "set_scheduler_quantum":
+4815:                 self.__class__.scheduler_quantum = max(1, min(10, int(data.get("quantum", 2))))
+4816:                 self.record_event("SCHEDULER_QUANTUM", None, f"Round Robin quantum set to {self.__class__.scheduler_quantum} ticks.", "[SIMULATION]")
+4817:             elif action == "set_custom_scheduler_processes":
+4818:                 procs_data = data.get("processes", [])
+4819:                 ok, err, proc_objs = CPUScheduler.validate_process_inputs(procs_data)
+4820:                 if ok and proc_objs:
+4821:                     self.__class__.scheduler_procs = proc_objs
+4822:                     self.record_event("SCHEDULER_INPUT_UPDATE", None, f"Scheduler loaded {len(proc_objs)} custom process specifications.", "[SIMULATION]")
+4823:                     self.send_response(200)
+4824:                     self.send_header("Content-Type", "application/json")
+4825:                     self.end_headers()
+4826:                     self.wfile.write(json.dumps({"status": "ok", "message": f"Loaded {len(proc_objs)} processes successfully."}).encode("utf-8"))
+4827:                     return
+4828:                 else:
+4829:                     self.send_response(400)
+4830:                     self.send_header("Content-Type", "application/json")
+4831:                     self.end_headers()
+4832:                     self.wfile.write(json.dumps({"status": "error", "message": err}).encode("utf-8"))
+4833:                     return
+4834:             elif action == "reset_scheduler_dataset":
+4835:                 dataset_key = data.get("dataset", "standard")
+4836:                 examples = CPUScheduler.get_example_datasets()
+4837:                 key_map = {
+4838:                     "standard": "standard",
+4839:                     "convoy": "convoy_effect",
+4840:                     "convoy_effect": "convoy_effect",
+4841:                     "priority_mix": "priority_mix",
+4842:                     "staggered": "staggered_arrivals",
+4843:                     "staggered_arrivals": "staggered_arrivals",
+4844:                 }
+4845:                 mapped_key = key_map.get(dataset_key, dataset_key)
+4846:                 if mapped_key in examples:
+4847:                     self.__class__.scheduler_procs = [
+4848:                         ScheduledProcess(
+4849:                             pid=d.get("pid", i + 1),
+4850:                             label=d.get("label", f"P{i+1}"),
+4851:                             arrival_time=d.get("arrival_time", 0),
+4852:                             burst_time=d.get("burst_time", 1),
+4853:                             priority=d.get("priority", 1),
+4854:                         )
+4855:                         for i, d in enumerate(examples[mapped_key])
+4856:                     ]
+4857:                 else:
+4858:                     self.__class__.scheduler_procs = CPUScheduler.get_default_processes()
+4859:                 self.record_event("SCHEDULER_RESET", None, f"Scheduler dataset reset to '{dataset_key}'.", "[SIMULATION]")
+4860:                 self.send_response(200)
+4861:                 self.send_header("Content-Type", "application/json")
+4862:                 self.end_headers()
+4863:                 self.wfile.write(json.dumps({"status": "ok", "message": f"Reset to {dataset_key}"}).encode("utf-8"))
+4864:                 return
+4865:             elif action == "set_deadlock_scenario":
+4866:                 self.deadlock_scenario_key = data.get("scenario", "two_process")
+4867:             elif action == "step_two_process_deadlock":
+4868:                 st = self.two_proc_deadlock.step()
+4869:                 self.record_event("DEADLOCK_STEP", None, st["title"], "[SIMULATION]")
+4870:             elif action == "reset_two_process_deadlock":
+4871:                 self.two_proc_deadlock.reset()
+4872:                 self.record_event("DEADLOCK_RESET", None, "2-process deadlock scenario reset.", "[SIMULATION]")
+4873:             elif action == "recover_two_process_deadlock":
+4874:                 self.two_proc_deadlock.step_idx = 5
+4875:                 st = self.two_proc_deadlock.get_state()
+4876:                 self.record_event("DEADLOCK_RECOVERY", None, st["title"], "[SIMULATION]")
+4877:             elif action == "evaluate_banker_request":

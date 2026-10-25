@@ -1,0 +1,250 @@
+789: <div id="tab-overview">
+790:   <!-- 5 Executive KPI Cards -->
+791:   <div class="ov-kpi-grid">
+792:     <!-- KPI 1: CPU -->
+793:     <div class="ov-kpi-card">
+794:       <div class="ov-kpi-header">
+795:         <span class="ov-kpi-title">CPU Utilization</span>
+796:         <span class="badge badge-live" id="ov-kpi-cpu-delta">+0.5%</span>
+797:       </div>
+798:       <div class="ov-kpi-value" id="ov-kpi-cpu-val">18.5%</div>
+799:       <div class="threshold-track" style="margin-bottom:6px;">
+800:         <div id="ov-kpi-cpu-bar" style="width:18.5%; height:100%; background:var(--accent-cyan); transition:width 0.3s;"></div>
+801:         <div class="threshold-marker threshold-marker-80" title="Alert Threshold (80%)"></div>
+802:       </div>
+803:       <canvas id="ov-sparkline-cpu" class="ov-sparkline"></canvas>
+804:       <div class="ov-kpi-sub" style="margin-top:4px;">
+805:         <span>Active tasks: <b id="ov-kpi-procs" style="color:#fff;">142</b></span>
+806:         <span style="color:#64748b;">Host Telemetry</span>
+807:       </div>
+808:     </div>
+809: 
+810:     <!-- KPI 2: RAM -->
+811:     <div class="ov-kpi-card">
+812:       <div class="ov-kpi-header">
+813:         <span class="ov-kpi-title">Memory (RAM)</span>
+814:         <span class="badge badge-live" id="ov-kpi-ram-delta">0.0%</span>
+815:       </div>
+816:       <div class="ov-kpi-value" id="ov-kpi-ram-val">42.0%</div>
+817:       <div class="threshold-track" style="margin-bottom:6px;">
+818:         <div id="ov-kpi-ram-bar" style="width:42.0%; height:100%; background:#818cf8; transition:width 0.3s;"></div>
+819:         <div class="threshold-marker threshold-marker-85" title="Alert Threshold (85%)"></div>
+820:       </div>
+821:       <canvas id="ov-sparkline-ram" class="ov-sparkline"></canvas>
+822:       <div class="ov-kpi-sub" style="margin-top:4px;">
+823:         <span>Used: <b id="ov-kpi-ram-used" style="color:#fff;">4.1 GB</b></span>
+824:         <span>Free: <b id="ov-kpi-ram-free" style="color:#fff;">12.3 GB</b></span>
+825:       </div>
+826:     </div>
+827: 
+828:     <!-- KPI 3: Health -->
+829:     <div class="ov-kpi-card">
+830:       <div class="ov-kpi-header">
+831:         <span class="ov-kpi-title">System Health</span>
+832:         <span class="badge badge-success" id="ov-kpi-health-cat">OPTIMAL</span>
+833:       </div>
+834:       <div class="ov-kpi-value" id="ov-kpi-health-val" style="color:#10b981;">98 <span style="font-size:0.9rem; color:#64748b;">/ 100</span></div>
+835:       <div class="threshold-track" style="margin-bottom:6px;">
+836:         <div id="ov-kpi-health-bar" style="width:98%; height:100%; background:#10b981; transition:width 0.3s;"></div>
+837:       </div>
+838:       <div class="ov-kpi-sub" style="margin-top:8px;">
+839:         <span>Stability: <b id="ov-kpi-health-stab" style="color:#10b981;">99%</b></span>
+840:         <span>CPU● RAM● Disk●</span>
+841:       </div>
+842:       <div style="font-size:0.7rem; color:#94a3b8; margin-top:4px;" id="ov-kpi-health-recom">Autonomous supervisor nominal.</div>
+843:     </div>
+844: 
+845:     <!-- KPI 4: Managed Process -->
+846:     <div class="ov-kpi-card">
+847:       <div class="ov-kpi-header">
+848:         <span class="ov-kpi-title">Supervised Workload</span>
+849:         <span class="badge badge-live" id="ov-kpi-app-state">● RUNNING</span>
+850:       </div>
+851:       <div class="ov-kpi-value" id="ov-kpi-app-pid" style="color:var(--accent-cyan); font-size:1.35rem;">PID 8556</div>
+852:       <div class="prop-row"><span class="label">Binary:</span><span class="val" id="ov-kpi-app-name">dummy_app.py</span></div>
+853:       <div class="prop-row"><span class="label">Uptime:</span><span class="val" id="ov-kpi-app-uptime">45s uptime</span></div>
+854:       <div class="prop-row"><span class="label">CPU / RAM:</span><span class="val" id="ov-kpi-app-res">1.2% / 18.4MB</span></div>
+855:     </div>
+856: 
+857:     <!-- KPI 5: Self-Healing & SLA -->
+858:     <div class="ov-kpi-card">
+859:       <div class="ov-kpi-header">
+860:         <span class="ov-kpi-title">Autonomic Recovery</span>
+861:         <span class="badge badge-success" id="ov-kpi-rec-sla-badge">SLA ≤ 2.50s</span>
+862:       </div>
+863:       <div class="ov-kpi-value" id="ov-kpi-rec-status" style="font-size:1.25rem; color:#10b981;">STANDBY</div>
+864:       <div class="prop-row"><span class="label">Measured Latency:</span><span class="val" id="ov-kpi-rec-latency">Pending (No crash)</span></div>
+865:       <div class="prop-row"><span class="label">Total Restarts:</span><span class="val" id="ov-kpi-rec-total">0</span></div>
+866:       <div class="prop-row"><span class="label">Success Rate:</span><span class="val" id="ov-kpi-rec-rate">100.0%</span></div>
+867:     </div>
+868:   </div>
+869: 
+870:   <!-- Resource Trend Chart & Recent Events -->
+871:   <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-bottom:14px;">
+872:     <!-- Compact Trend Chart -->
+873:     <div class="panel-card" style="margin-bottom:0;">
+874:       <div class="panel-top">
+875:         <div class="panel-title">
+876:           <span>Real-Time Host Resource Trend (CPU & RAM)</span>
+877:           <span class="badge badge-live">[LIVE TELEMETRY]</span>
+878:         </div>
+879:         <div style="display:flex; gap:6px; align-items:center;">
+880:           <div style="display:inline-flex; border:1px solid var(--border); border-radius:4px; overflow:hidden;">
+881:             <button class="btn btn-sm" id="range-btn-30" onclick="setResourceRange(30)">30s</button>
+882:             <button class="btn btn-sm btn-accent" id="range-btn-60" onclick="setResourceRange(60)">60s</button>
+883:             <button class="btn btn-sm" id="range-btn-120" onclick="setResourceRange(120)">120s</button>
+884:           </div>
+885:         </div>
+886:       </div>
+887:       <canvas id="resource-chart-canvas" width="600" height="150" style="width:100%; height:150px; background:#020617; border-radius:6px;"></canvas>
+888:       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:0.72rem; color:var(--text-muted);">
+889:         <div style="display:flex; gap:12px;">
+890:           <span><span style="display:inline-block; width:10px; height:3px; background:#06b6d4; margin-right:4px;"></span> Host CPU %</span>
+891:           <span><span style="display:inline-block; width:10px; height:3px; background:#818cf8; margin-right:4px;"></span> Host RAM %</span>
+892:         </div>
+893:         <span>Sampling interval: 1.0s</span>
+894:       </div>
+895:     </div>
+896: 
+897:     <!-- Recent System Events -->
+898:     <div class="panel-card" style="margin-bottom:0;">
+899:       <div class="panel-top">
+900:         <div class="panel-title">
+901:           <span>Recent System Events</span>
+902:           <span class="badge badge-live">[AUDIT STREAM]</span>
+903:         </div>
+904:         <button class="btn btn-sm" onclick="switchMainTab('diagnostics')">Full Trace ➔</button>
+905:       </div>
+906:       <div id="ov-recent-events-list" style="max-height:165px; overflow-y:auto; font-size:0.74rem;">
+907:         <div style="color:#64748b; padding:8px 0;">Listening for system events...</div>
+908:       </div>
+909:     </div>
+910:   </div>
+911: 
+912:   <!-- Workspace Launchpad: 4 Cards -->
+913:   <div class="launchpad-grid">
+914:     <div class="launchpad-card" onclick="switchMainTab('process-lab')">
+915:       <div>
+916:         <div class="launchpad-title"><span>⚙️</span> OS Process Lifecycle & Scheduler Lab</div>
+917:         <div class="launchpad-desc">Animated 5-state process lifecycle simulation (NEW, READY, RUNNING, WAITING, TERMINATED), dynamic PID allocation pipeline, 15-field PCB inspector, and multi-algorithm Gantt execution timeline.</div>
+918:       </div>
+919:       <div class="launchpad-link">Open Process Studio ➔</div>
+920:     </div>
+921: 
+922:     <div class="launchpad-card" onclick="switchMainTab('recovery')">
+923:       <div>
+924:         <div class="launchpad-title"><span>🛡️</span> Self-Healing & Recovery</div>
+925:         <div class="launchpad-desc">Real managed-process crash detection (<200ms), 6-stage handover pipeline, original vs. replacement PID forensics, autonomic timing waterfall, and SLA compliance analytics.</div>
+926:       </div>
+927:       <div class="launchpad-link">Open Recovery Studio ➔</div>
+928:     </div>
+929: 
+930:     <div class="launchpad-card" onclick="switchMainTab('deadlock')">
+931:       <div>
+932:         <div class="launchpad-title"><span>🔒</span> Deadlock & Banker's Lab</div>
+933:         <div class="launchpad-desc">Interactive circular-wait deadlock formation with Resource Allocation Graph (RAG), cycle detection alerts, and Dijkstra's Banker's Algorithm safe-sequence derivation matrix editor.</div>
+934:       </div>
+935:       <div class="launchpad-link">Open Deadlock Studio ➔</div>
+936:     </div>
+937: 
+938:     <div class="launchpad-card" onclick="switchMainTab('diagnostics')">
+939:       <div>
+940:         <div class="launchpad-title"><span>🩺</span> Diagnostics & Telemetry</div>
+941:         <div class="launchpad-desc">Machine Learning failure prediction (0-100%), autonomic health decomposition, 8-module subsystem dependency topology map, MAPE-K decision policy engine, and synchronized audit log.</div>
+942:       </div>
+943:       <div class="launchpad-link">Open Diagnostics Suite ➔</div>
+944:     </div>
+945:   </div>
+946: </div>
+947: 
+948: <!-- ========================================================================= -->
+949: <!-- TAB 2: PROCESS & SCHEDULER LAB -->
+950: <!-- ========================================================================= -->
+951: <div id="tab-process-lab" style="display: none;">
+952:   <!-- CPU Execution Studio Header & Quick-Access Controls -->
+953:   <div class="panel-card" style="padding:12px 16px; margin-bottom:12px;">
+954:     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+955:       <div>
+956:         <div style="display:flex; align-items:center; gap:8px;">
+957:           <h2 style="font-size:1.15rem; font-weight:900; color:#38bdf8; letter-spacing:0.5px;">⚡ CPU EXECUTION STUDIO</h2>
+958:           <span class="badge badge-sim">[SIMULATION ENGINE ACTIVE]</span>
+959:           <span class="badge badge-live" id="sch-active-algo-badge" style="background:#1e1b4b; border-color:#818cf8; color:#c7d2fe;">ALGO: RR (Q=2)</span>
+960:         </div>
+961:         <p style="color:var(--text-muted); font-size:0.75rem; margin-top:2px;">
+962:           Interactive OS Process Lifecycle, Short-Term CPU Scheduling, Live Ready Queue & Gantt Execution Timeline
+963:         </p>
+964:       </div>
+965:       <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+966:         <button class="btn btn-sm btn-purple" id="btn-toggle-comparison" onclick="toggleAlgorithmComparison()">📊 Compare All Algorithms</button>
+967:         <button class="btn btn-sm" onclick="toggleProcessInputDrawer()" id="btn-toggle-inputs">✏️ Process Input Studio</button>
+968:         <button class="btn btn-sm" onclick="toggleSecondaryStateMachine()" id="btn-toggle-secondary-sm">👁️ 5-State Machine View</button>
+969:       </div>
+970:     </div>
+971:   </div>
+972: 
+973:   <!-- Collapsible Process-Input Studio Table -->
+974:   <div id="process-input-drawer" style="display:none; background:#070d19; border:1px solid #1e293b; border-radius:8px; padding:12px; margin-bottom:12px;">
+975:     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+976:       <div>
+977:         <span style="font-weight:800; font-size:0.85rem; color:#93c5fd;">Custom Process Specifications (Max 10 jobs)</span>
+978:         <div style="font-size:0.7rem; color:var(--text-dim); margin-top:1px;">Assigns unique simulated PIDs (<span style="color:#38bdf8;">[SIMULATED PID]</span> namespace: P101–P999) isolated from real host processes.</div>
+979:       </div>
+980:       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+981:         <span style="font-size:0.75rem; color:var(--text-muted); font-weight:bold;">Presets:</span>
+982:         <select id="select-dataset" style="background:#1e293b; border:1px solid var(--border-highlight); color:#fff; border-radius:4px; padding:3px 8px; font-size:0.76rem;" onchange="loadPresetDataset(this.value)">
+983:           <option value="standard">Standard Benchmark (P1–P4)</option>
+984:           <option value="convoy">Convoy Effect (Heavy P1)</option>
+985:           <option value="priority_mix">Priority Mix</option>
+986:           <option value="staggered">Staggered Arrivals</option>
+987:         </select>
+988:         <button class="btn btn-sm btn-accent" onclick="addProcessRow()">➕ Add Process</button>
+989:         <button class="btn btn-sm" onclick="resetCurrentDataset()">↺ Reset</button>
+990:         <button class="btn btn-sm btn-success" onclick="applyCustomProcesses()">▶ Apply & Recalculate</button>
+991:       </div>
+992:     </div>
+993:     <div id="input-error-msg" style="display:none; color:#fca5a5; background:#7f1d1d; border:1px solid #ef4444; border-radius:4px; padding:4px 8px; font-size:0.74rem; margin-bottom:6px;"></div>
+994:     <div style="overflow-x:auto;">
+995:       <table style="width:100%; border-collapse:collapse; font-size:0.76rem;">
+996:         <thead>
+997:           <tr style="border-bottom:1px solid #1e293b; color:var(--text-muted); text-align:left;">
+998:             <th style="padding:6px;">PID / Label</th>
+999:             <th style="padding:6px;">Arrival Time (AT ≥ 0)</th>
+1000:             <th style="padding:6px;">Burst Time (BT ≥ 1)</th>
+1001:             <th style="padding:6px;">Priority (1 = Highest)</th>
+1002:             <th style="padding:6px; text-align:right;">Actions</th>
+1003:           </tr>
+1004:         </thead>
+1005:         <tbody id="process-input-tbody">
+1006:           <!-- Populated by JS -->
+1007:         </tbody>
+1008:       </table>
+1009:     </div>
+1010:   </div>
+1011: 
+1012:   <!-- Collapsible Side-by-Side Algorithm Comparison Panel -->
+1013:   <div id="algorithm-comparison-panel" style="display:none; margin-bottom:12px; background:#0c1222; border:1px solid var(--accent-purple); border-radius:8px; padding:12px;">
+1014:     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+1015:       <span style="font-weight:800; font-size:0.85rem; color:#d8b4fe;">📊 Algorithm Performance Matrix (Side-by-Side Benchmark)</span>
+1016:       <button class="btn btn-sm" onclick="toggleAlgorithmComparison()">✕ Close</button>
+1017:     </div>
+1018:     <div style="overflow-x:auto;">
+1019:       <table style="width:100%; border-collapse:collapse; font-size:0.76rem;">
+1020:         <thead>
+1021:           <tr style="border-bottom:1px solid #1e293b; color:var(--text-muted); text-align:left;">
+1022:             <th style="padding:6px;">Algorithm</th>
+1023:             <th style="padding:6px;">Avg Turnaround (TAT)</th>
+1024:             <th style="padding:6px;">Avg Waiting Time (WT)</th>
+1025:             <th style="padding:6px;">Avg Response Time (RT)</th>
+1026:             <th style="padding:6px;">Context Switches</th>
+1027:             <th style="padding:6px;">Relative Efficiency</th>
+1028:           </tr>
+1029:         </thead>
+1030:         <tbody id="scheduler-comparison-table-body">
+1031:           <!-- Populated by JS -->
+1032:         </tbody>
+1033:       </table>
+1034:     </div>
+1035:   </div>
+1036: 
+1037:   <!-- 1. Algorithm Selector Cards -->
+1038:   <div class="algo-selector-grid">

@@ -1,0 +1,393 @@
+let schState = {
+      data: null,
+      currentTick: 0,
+      isPlaying: false,
+      timer: null,
+      playInterval: 800,
+      inputRows: [],
+      lastActiveJob: null
+    };
+
+    function setAlgorithm(algo) {
+      ensureAudioContext();
+      postAction('set_scheduler_algo', { algo: algo });
+    }
+
+    function updateQuantum(val) {
+      const q = Math.max(1, Math.min(10, parseInt(val) || 2));
+      postAction('set_scheduler_quantum', { quantum: q });
+    }
+
+    function renderScheduler(sch) {
+      if (!sch) return;
+      schState.data = sch;
+
+      const algo = sch.algorithm || 'RR';
+      const q = sch.quantum || 2;
+
+      // Update Pill & Buttons
+      const pill = document.getElementById('sch-algo-pill');
+      if (pill) pill.innerText = `${algo}` + (algo === 'RR' ? ` (Q=${q})` : '');
+
+      ['FCFS', 'SJF', 'RR', 'PRIORITY'].forEach(a => {
+        const btn = document.getElementById('btn-algo-' + a);
+        if (btn) {
+          if (a === algo) btn.className = 'btn btn-sm btn-cyan';
+          else btn.className = 'btn btn-sm';
+        }
+      });
+
+      const qWrap = document.getElementById('rr-quantum-wrap');
+      if (qWrap) qWrap.style.display = (algo === 'RR') ? 'inline-flex' : 'none';
+      const qInput = document.getElementById('input-quantum');
+      if (qInput) qInput.value = q;
+
+      // Populate input table if empty
+      if (schState.inputRows.length === 0 && sch.raw_processes) {
+        schState.inputRows = sch.raw_processes.map(p => ({
+          label: p.label || ('P' + p.pid),
+          arrival_time: p.arrival_time,
+          burst_time: p.burst_time,
+          priority: p.priority
+        }));
+        renderInputTable();
+      }
+
+      // Render static Gantt Track & Ruler
+      renderGanttTrack(sch);
+
+      // Render Results Table
+      renderResultsTable(sch);
+
+      // Update tick visual
+      const maxDur = sch.total_duration || 12;
+      if (schState.currentTick > maxDur) schState.currentTick = maxDur;
+      updateSchVisualsAtTick(schState.currentTick);
+    }
+
+    function renderGanttTrack(sch) {
+      const maxDur = sch.total_duration || 12;
+      const ruler = document.getElementById('gantt-ruler');
+      const track = document.getElementById('gantt-track');
+      if (!ruler || !track) return;
+
+      ruler.innerHTML = '';
+      for (let t = 0; t <= maxDur; t++) {
+        const m = document.createElement('div');
+        m.style.position = 'absolute';
+        m.style.left = ((t / maxDur) * 100) + '%';
+        m.style.transform = 'translateX(-50%)';
+        m.innerText = t;
+        ruler.appendChild(m);
+      }
+
+      track.innerHTML = '';
+      const gantt = sch.gantt || [];
+      const colors = ['#0284c7', '#0d9488', '#7c3aed', '#ea580c', '#16a34a', '#ca8a04'];
+      gantt.forEach((b, idx) => {
+        const dur = b.end - b.start;
+        const wPct = (dur / maxDur) * 100;
+        const el = document.createElement('div');
+        el.style.width = wPct + '%';
+        el.style.height = '100%';
+        el.style.display = 'flex';
+        el.style.flexDirection = 'column';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '0.72rem';
+        el.style.borderRight = '1px solid #1e293b';
+        el.style.transition = 'all 0.15s ease';
+        el.id = `gantt-blk-${idx}`;
+
+        if (b.label === 'IDLE') {
+          el.style.background = '#090d16';
+          el.style.color = '#475569';
+          el.innerText = 'IDLE';
+        } else {
+          const col = colors[idx % colors.length];
+          el.style.background = col;
+          el.style.color = '#fff';
+          el.innerHTML = `<span>${b.label}</span><small style="font-size:0.6rem; opacity:0.8;">${dur}t</small>`;
+        }
+        track.appendChild(el);
+      });
+    }
+
+    function renderResultsTable(sch) {
+      const tbody = document.getElementById('sch-results-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      const procs = sch.raw_processes || [];
+      const metrics = sch.process_metrics || [];
+
+      procs.forEach(p => {
+        const m = metrics.find(item => item.label === p.label) || {};
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><b>${p.label}</b></td>
+          <td style="font-family:var(--font-mono);">${p.arrival_time}</td>
+          <td style="font-family:var(--font-mono);">${p.burst_time}t</td>
+          <td style="font-family:var(--font-mono);">${p.priority}</td>
+          <td style="font-family:var(--font-mono);">${m.completion_time !== undefined ? m.completion_time + 't' : '-'}</td>
+          <td style="font-family:var(--font-mono); color:#22c55e;">${m.turnaround_time !== undefined ? m.turnaround_time + 't' : '-'}</td>
+          <td style="font-family:var(--font-mono); color:#38bdf8;">${m.waiting_time !== undefined ? m.waiting_time + 't' : '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const avgTat = document.getElementById('avg-tat');
+      if (avgTat) avgTat.innerText = (sch.avg_turnaround_time || 0) + 't';
+      const avgWt = document.getElementById('avg-wt');
+      if (avgWt) avgWt.innerText = (sch.avg_waiting_time || 0) + 't';
+      const summary = document.getElementById('sch-results-summary');
+      if (summary) summary.innerText = `Context Switches: ${sch.context_switches || 0} | Total Duration: ${sch.total_duration || 0}t`;
+    }
+
+    function updateSchVisualsAtTick(tick) {
+      const sch = schState.data;
+      if (!sch) return;
+      const maxDur = sch.total_duration || 12;
+      tick = Math.max(0, Math.min(maxDur, tick));
+      schState.currentTick = tick;
+
+      // Clock Text
+      const clk = document.getElementById('sch-clock-text');
+      if (clk) clk.innerText = `t = ${tick}`;
+
+      const stBadge = document.getElementById('sch-state-badge');
+      if (stBadge) {
+        if (schState.isPlaying) {
+          stBadge.innerText = '● RUNNING';
+          stBadge.className = 'badge badge-green';
+        } else if (tick >= maxDur) {
+          stBadge.innerText = '✔ COMPLETED';
+          stBadge.className = 'badge badge-cyan';
+        } else {
+          stBadge.innerText = '○ PAUSED';
+          stBadge.className = 'badge badge-gray';
+        }
+      }
+
+      // Tick data
+      let tickData = (sch.timeline_ticks && sch.timeline_ticks[tick]) ? sch.timeline_ticks[tick] : {
+        active_process: null,
+        ready_queue: [],
+        remaining_burst: {},
+        states: {}
+      };
+
+      // Sound triggers
+      if (tickData.active_process && tickData.active_process !== schState.lastActiveJob) {
+        playTone('RUNNING');
+      }
+      if (tickData.is_context_switch) {
+        playTone('BLOCKED');
+      }
+      schState.lastActiveJob = tickData.active_process;
+
+      // 1. Ready Queue Stage
+      const rqList = document.getElementById('sch-ready-list');
+      const rqCount = document.getElementById('sch-rq-count');
+      const readyQueue = tickData.ready_queue || [];
+      if (rqCount) rqCount.innerText = `${readyQueue.length} queued`;
+      if (rqList) {
+        rqList.innerHTML = '';
+        if (readyQueue.length === 0) {
+          rqList.innerHTML = '<span style="color:#64748b; font-size:0.72rem;">No processes in ready queue.</span>';
+        } else {
+          readyQueue.forEach(jobLabel => {
+            const pObj = (sch.raw_processes || []).find(p => p.label === jobLabel) || { burst_time: 4, priority: 1 };
+            const rem = (tickData.remaining_burst && tickData.remaining_burst[jobLabel] !== undefined) ? tickData.remaining_burst[jobLabel] : pObj.burst_time;
+            const tok = document.createElement('div');
+            tok.className = 'proc-token';
+            tok.innerHTML = `<span>${jobLabel}</span><small>Rem: ${rem}t</small>`;
+            rqList.appendChild(tok);
+          });
+        }
+      }
+
+      // 2. CPU Core 0 Stage
+      const cpuBox = document.getElementById('cpu-socket-box');
+      const cpuPill = document.getElementById('cpu-pill');
+      const jobLbl = document.getElementById('cpu-job-label');
+      const burstLbl = document.getElementById('cpu-burst-countdown');
+      const progBar = document.getElementById('cpu-progress-bar');
+
+      if (tickData.active_process) {
+        const act = tickData.active_process;
+        const pObj = (sch.raw_processes || []).find(p => p.label === act) || { burst_time: 4 };
+        const rem = (tickData.remaining_burst && tickData.remaining_burst[act] !== undefined) ? tickData.remaining_burst[act] : 0;
+        const elapsed = Math.max(0, pObj.burst_time - rem);
+        const pct = Math.min(100, Math.round((elapsed / pObj.burst_time) * 100));
+
+        if (cpuBox) { cpuBox.className = 'cpu-socket active'; }
+        if (cpuPill) { cpuPill.className = 'badge badge-green'; cpuPill.innerText = '● EXECUTING'; }
+        if (jobLbl) { jobLbl.innerText = act; jobLbl.style.color = '#22c55e'; }
+        if (burstLbl) { burstLbl.innerText = `Remaining: ${rem}t / ${pObj.burst_time}t (${pct}% Done)`; }
+        if (progBar) { progBar.style.width = pct + '%'; }
+      } else {
+        if (cpuBox) { cpuBox.className = 'cpu-socket idle'; }
+        if (cpuPill) { cpuPill.className = 'badge badge-gray'; cpuPill.innerText = 'IDLE'; }
+        if (jobLbl) { jobLbl.innerText = 'CPU IDLE'; jobLbl.style.color = '#94a3b8'; }
+        if (burstLbl) { burstLbl.innerText = 'Awaiting ready process...'; }
+        if (progBar) { progBar.style.width = '0%'; }
+      }
+
+      // 3. Completed Jobs Stage
+      const compList = document.getElementById('sch-completed-list');
+      const compCount = document.getElementById('sch-comp-count');
+      const completedJobs = [];
+      const states = tickData.states || {};
+      Object.keys(states).forEach(j => {
+        if (states[j] === 'TERMINATED') completedJobs.push(j);
+      });
+      if (compCount) compCount.innerText = `${completedJobs.length} finished`;
+      if (compList) {
+        compList.innerHTML = '';
+        if (completedJobs.length === 0) {
+          compList.innerHTML = '<span style="color:#64748b; font-size:0.72rem;">No finished processes yet.</span>';
+        } else {
+          completedJobs.forEach(jobLabel => {
+            const tok = document.createElement('div');
+            tok.className = 'proc-token';
+            tok.style.borderColor = '#16a34a';
+            tok.style.background = '#052e16';
+            tok.innerHTML = `<span>${jobLabel}</span><small style="color:#4ade80;">✔ Exited</small>`;
+            compList.appendChild(tok);
+          });
+        }
+      }
+
+      // 4. Gantt Cursor & Block Glow
+      const cursor = document.getElementById('gantt-cursor');
+      if (cursor && maxDur > 0) {
+        cursor.style.left = ((tick / maxDur) * 100) + '%';
+      }
+      (sch.gantt || []).forEach((b, idx) => {
+        const el = document.getElementById(`gantt-blk-${idx}`);
+        if (el) {
+          if (b.start <= tick && tick < b.end) {
+            el.style.boxShadow = '0 0 10px #22c55e';
+            el.style.opacity = '1.0';
+          } else if (b.end <= tick) {
+            el.style.boxShadow = 'none';
+            el.style.opacity = '0.9';
+          } else {
+            el.style.boxShadow = 'none';
+            el.style.opacity = '0.4';
+          }
+        }
+      });
+    }
+
+    // Playback Controls
+    function schStep(delta) {
+      if (!schState.data) return;
+      ensureAudioContext();
+      const maxDur = schState.data.total_duration || 12;
+      const newTick = Math.max(0, Math.min(maxDur, schState.currentTick + delta));
+      updateSchVisualsAtTick(newTick);
+      if (newTick >= maxDur && schState.isPlaying) {
+        schTogglePlay();
+      }
+    }
+
+    function schTogglePlay() {
+      ensureAudioContext();
+      schState.isPlaying = !schState.isPlaying;
+      const btn = document.getElementById('btn-sch-play');
+      if (btn) {
+        btn.innerText = schState.isPlaying ? '⏸ Pause' : '▶ Play';
+        btn.className = 'btn btn-sm ' + (schState.isPlaying ? 'btn-amber' : 'btn-green');
+      }
+      if (schState.timer) {
+        clearInterval(schState.timer);
+        schState.timer = null;
+      }
+      if (schState.isPlaying) {
+        if (schState.data && schState.currentTick >= schState.data.total_duration) {
+          schState.currentTick = 0;
+        }
+        schState.timer = setInterval(() => {
+          schStep(1);
+        }, schState.playInterval);
+      }
+    }
+
+    function schResetTick() {
+      if (schState.isPlaying) schTogglePlay();
+      updateSchVisualsAtTick(0);
+    }
+
+    function setSchSpeed(ms, label) {
+      schState.playInterval = ms;
+      ['05', '1', '2', '4'].forEach(l => {
+        const b = document.getElementById('btn-spd-' + l);
+        if (b) b.className = 'btn btn-sm' + (l === label ? ' btn-cyan' : '');
+      });
+      if (schState.isPlaying) {
+        clearInterval(schState.timer);
+        schState.timer = setInterval(() => { schStep(1); }, schState.playInterval);
+      }
+    }
+
+    // Process Input Table Editor
+    function renderInputTable() {
+      const tbody = document.getElementById('sch-input-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      schState.inputRows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="text" value="${row.label}" style="width:65px; background:#020617; border:1px solid var(--border); color:#fff; border-radius:3px; padding:2px 4px; font-weight:bold;" onchange="updateInputCell(${idx}, 'label', this.value)"></td>
+          <td><input type="number" min="0" max="100" value="${row.arrival_time}" style="width:55px; background:#020617; border:1px solid var(--border); color:#fff; border-radius:3px; padding:2px 4px;" onchange="updateInputCell(${idx}, 'arrival_time', parseInt(this.value)||0)"></td>
+          <td><input type="number" min="1" max="100" value="${row.burst_time}" style="width:55px; background:#020617; border:1px solid var(--border); color:#fff; border-radius:3px; padding:2px 4px;" onchange="updateInputCell(${idx}, 'burst_time', parseInt(this.value)||1)"></td>
+          <td><input type="number" min="1" max="10" value="${row.priority}" style="width:50px; background:#020617; border:1px solid var(--border); color:#fff; border-radius:3px; padding:2px 4px;" onchange="updateInputCell(${idx}, 'priority', parseInt(this.value)||1)"></td>
+          <td><button class="btn btn-sm btn-red" style="padding:2px 6px;" onclick="removeProcessRow(${idx})" ${schState.inputRows.length <= 1 ? 'disabled' : ''}>✕</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateInputCell(idx, field, val) {
+      if (schState.inputRows[idx]) schState.inputRows[idx][field] = val;
+    }
+
+    function addProcessRow() {
+      if (schState.inputRows.length >= 8) return;
+      const n = schState.inputRows.length + 1;
+      schState.inputRows.push({ label: 'P' + n, arrival_time: n - 1, burst_time: 4, priority: n });
+      renderInputTable();
+    }
+
+    function removeProcessRow(idx) {
+      if (schState.inputRows.length <= 1) return;
+      schState.inputRows.splice(idx, 1);
+      renderInputTable();
+    }
+
+    function resetCurrentDataset() {
+      postAction('reset_scheduler_dataset', { dataset: 'standard' });
+      schState.inputRows = [];
+    }
+
+    function applyCustomProcesses() {
+      if (schState.inputRows.length === 0) return;
+      fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_custom_scheduler_processes', processes: schState.inputRows })
+      }).then(r => r.json()).then(res => {
+        if (res.status === 'ok') {
+          const errEl = document.getElementById('input-error-msg');
+          if (errEl) errEl.style.display = 'none';
+          pollData();
+        } else {
+          const errEl = document.getElementById('input-error-msg');
+          if (errEl) { errEl.innerText = res.message || 'Validation error'; errEl.style.display = 'block'; }
+        }
+      });
+    }
+
+    

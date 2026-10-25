@@ -1,0 +1,150 @@
+1519: <div id="tab-deadlock" style="display: none;">
+1520:   <!-- Mode Selector Toolbar -->
+1521:   <div class="panel-card" style="padding:10px 16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+1522:     <div style="display:flex; align-items:center; gap:8px;">
+1523:       <span style="font-weight:800; font-size:0.95rem; color:#fff;">Deadlock Formation & Avoidance Studio</span>
+1524:       <span class="badge badge-sim">[SIMULATION]</span>
+1525:     </div>
+1526:     <div style="display: flex; gap: 6px;">
+1527:       <button class="btn btn-sm btn-accent" id="btn-mode-formation" onclick="setDeadlockMode('formation')">1. Deadlock Formation & Detection (Circular Wait)</button>
+1528:       <button class="btn btn-sm" id="btn-mode-banker" onclick="setDeadlockMode('banker')">2. Dijkstra's Banker's Algorithm (Avoidance)</button>
+1529:     </div>
+1530:   </div>
+1531: 
+1532:   <!-- Mode 1: Deadlock Formation Demo -->
+1533:   <div id="deadlock-formation-view">
+1534:     <div class="panel-card">
+1535:       <div class="panel-top">
+1536:         <span class="panel-title">Resource Allocation Graph (RAG) & Circular Wait Cycle</span>
+1537:         <span class="badge badge-warn" id="rag-cycle-alert" style="display:none;">CIRCULAR WAIT DEADLOCK DETECTED</span>
+1538:       </div>
+1539:       <div class="svg-box">
+1540:         <svg id="svg-rag" width="560" height="200" viewBox="0 0 560 200">
+1541:           <circle cx="120" cy="100" r="32" fill="#1e1b4b" stroke="#818cf8" stroke-width="2.5"/>
+1542:           <text x="120" y="98" fill="#e0e7ff" font-size="12" font-weight="bold" text-anchor="middle">P1</text>
+1543:           <text x="120" y="114" fill="#a5b4fc" font-size="8" text-anchor="middle" id="rag-p1-state">READY</text>
+1544: 
+1545:           <circle cx="440" cy="100" r="32" fill="#1e1b4b" stroke="#818cf8" stroke-width="2.5"/>
+1546:           <text x="440" y="98" fill="#e0e7ff" font-size="12" font-weight="bold" text-anchor="middle">P2</text>
+1547:           <text x="440" y="114" fill="#a5b4fc" font-size="8" text-anchor="middle" id="rag-p2-state">READY</text>
+1548: 
+1549:           <rect x="255" y="20" width="50" height="40" rx="6" fill="#164e63" stroke="#06b6d4" stroke-width="2"/>
+1550:           <text x="280" y="42" fill="#a5f3fc" font-size="10" font-weight="bold" text-anchor="middle">R1</text>
+1551: 
+1552:           <rect x="255" y="140" width="50" height="40" rx="6" fill="#164e63" stroke="#06b6d4" stroke-width="2"/>
+1553:           <text x="280" y="162" fill="#a5f3fc" font-size="10" font-weight="bold" text-anchor="middle">R2</text>
+1554: 
+1555:           <line id="edge-r1-p1" x1="255" y1="40" x2="152" y2="85" stroke="#334155" stroke-width="2"/>
+1556:           <line id="edge-r2-p2" x1="305" y1="160" x2="408" y2="115" stroke="#334155" stroke-width="2"/>
+1557:           <line id="edge-p1-r2" x1="152" y1="115" x2="255" y2="160" stroke="#334155" stroke-width="2" stroke-dasharray="3,3"/>
+1558:           <line id="edge-p2-r1" x1="408" y1="85" x2="305" y2="40" stroke="#334155" stroke-width="2" stroke-dasharray="3,3"/>
+1559:         </svg>
+1560:       </div>
+1561: 
+1562:       <div style="display:flex; justify-content:space-between; align-items:center; background:#0c1222; padding:8px 12px; border-radius:6px; margin-top:10px;">
+1563:         <span id="rag-step-explanation" style="font-family:monospace; font-size:0.78rem; color:#e2e8f0;">Step 0: Initial State — Resources R1 and R2 are unallocated.</span>
+1564:         <div style="display:flex; gap:6px;">
+1565:           <button class="btn btn-sm" onclick="postAction('reset_two_process_deadlock')">↺ Reset</button>
+1566:           <button class="btn btn-sm btn-accent" onclick="postAction('step_two_process_deadlock')">Step Formation ➔</button>
+1567:         </div>
+1568:       </div>
+1569:     </div>
+1570:   </div>
+1571: 
+1572:   <!-- Mode 2: Banker's Avoidance Demo -->
+1573:   <div id="deadlock-banker-view" style="display:none;">
+1574:     <div class="panel-card">
+1575:       <div class="panel-top">
+1576:         <div class="panel-title">
+1577:           <span>Dijkstra's Banker's Algorithm — Safe Sequence & Avoidance Matrix</span>
+1578:           <span class="badge badge-success" id="banker-result-badge">SAFE STATE</span>
+1579:         </div>
+1580:         <div style="display:flex; gap:6px;">
+1581:           <button class="btn btn-sm" onclick="toggleBankerMatrixDrawer()" id="btn-toggle-banker-inputs">✏️ Edit Matrices</button>
+1582:           <button class="btn btn-sm" onclick="loadBankerScenario('safe_banker')">Reset Scenario</button>
+1583:         </div>
+1584:       </div>
+1585: 
+1586:       <!-- Safe Sequence Banner -->
+1587:       <div style="background:#0c1222; border:1px solid #1e293b; border-radius:6px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+1588:         <div>
+1589:           <span style="font-size:0.72rem; color:var(--text-muted); font-weight:bold; text-transform:uppercase;">Evaluated Safe Sequence:</span>
+1590:           <div id="banker-seq-display" style="font-family:monospace; font-weight:900; font-size:1.15rem; color:#10b981; margin-top:2px;">P1 ➔ P3 ➔ P4 ➔ P0 ➔ P2</div>
+1591:         </div>
+1592:         <div>
+1593:           <span style="font-size:0.72rem; color:var(--text-muted); font-weight:bold; text-transform:uppercase;">Available Vector:</span>
+1594:           <div id="banker-avail-display" style="font-family:monospace; font-weight:800; font-size:1.05rem; color:#38bdf8; margin-top:2px;">[3, 3, 2]</div>
+1595:         </div>
+1596:       </div>
+1597: 
+1598:       <!-- Matrix Grid: Allocation, Max, Need -->
+1599:       <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+1600:         <div style="background:#020617; border:1px solid #1e293b; border-radius:6px; padding:8px;">
+1601:           <div style="font-weight:700; font-size:0.74rem; color:#38bdf8; margin-bottom:4px;">ALLOCATION MATRIX</div>
+1602:           <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+1603:             <thead><tr style="border-bottom:1px solid #1e293b; color:var(--text-muted); text-align:left;"><th>Proc</th><th>A</th><th>B</th><th>C</th></tr></thead>
+1604:             <tbody id="tbody-banker-alloc"></tbody>
+1605:           </table>
+1606:         </div>
+1607: 
+1608:         <div style="background:#020617; border:1px solid #1e293b; border-radius:6px; padding:8px;">
+1609:           <div style="font-weight:700; font-size:0.74rem; color:#a5b4fc; margin-bottom:4px;">MAXIMUM MATRIX</div>
+1610:           <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+1611:             <thead><tr style="border-bottom:1px solid #1e293b; color:var(--text-muted); text-align:left;"><th>Proc</th><th>A</th><th>B</th><th>C</th></tr></thead>
+1612:             <tbody id="tbody-banker-max"></tbody>
+1613:           </table>
+1614:         </div>
+1615: 
+1616:         <div style="background:#020617; border:1px solid #1e293b; border-radius:6px; padding:8px;">
+1617:           <div style="font-weight:700; font-size:0.74rem; color:#34d399; margin-bottom:4px;">NEED MATRIX (MAX - ALLOC)</div>
+1618:           <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+1619:             <thead><tr style="border-bottom:1px solid #1e293b; color:var(--text-muted); text-align:left;"><th>Proc</th><th>A</th><th>B</th><th>C</th></tr></thead>
+1620:             <tbody id="tbody-banker-need"></tbody>
+1621:           </table>
+1622:         </div>
+1623:       </div>
+1624: 
+1625:       <!-- Resource Request Tester -->
+1626:       <div style="background:#0c1222; border:1px solid #1e293b; border-radius:6px; padding:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+1627:         <div style="display:flex; align-items:center; gap:8px;">
+1628:           <span style="font-size:0.75rem; font-weight:bold; color:#fff;">Submit Resource Request:</span>
+1629:           <select id="select-banker-proc" style="background:#1e293b; border:1px solid #334155; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.74rem;">
+1630:             <option value="0">P0</option><option value="1">P1</option><option value="2">P2</option><option value="3">P3</option><option value="4">P4</option>
+1631:           </select>
+1632:           <span style="font-size:0.74rem; color:var(--text-muted);">Request [A,B,C]:</span>
+1633:           <input type="number" id="banker-req-r1" value="1" min="0" max="5" style="width:36px; background:#1e293b; border:1px solid #334155; color:#fff; text-align:center; border-radius:3px; padding:2px;">
+1634:           <input type="number" id="banker-req-r2" value="0" min="0" max="5" style="width:36px; background:#1e293b; border:1px solid #334155; color:#fff; text-align:center; border-radius:3px; padding:2px;">
+1635:           <input type="number" id="banker-req-r3" value="2" min="0" max="5" style="width:36px; background:#1e293b; border:1px solid #334155; color:#fff; text-align:center; border-radius:3px; padding:2px;">
+1636:           <button class="btn btn-sm btn-accent" onclick="submitBankerRequest()">Evaluate Safety</button>
+1637:         </div>
+1638:         <div id="banker-trace-explanation" style="font-family:monospace; font-size:0.72rem; color:#94a3b8;">State verified safe. Need &le; Available.</div>
+1639:       </div>
+1640:     </div>
+1641:   </div>
+1642: </div>
+1643: 
+1644: <!-- ========================================================================= -->
+1645: <!-- TAB 5: DIAGNOSTICS & EVENT HISTORY -->
+1646: <!-- ========================================================================= -->
+1647: <div id="tab-diagnostics" style="display: none;">
+1648:   <!-- Diagnostics Internal Sub-navigation -->
+1649:   <div class="diag-subnav">
+1650:     <button class="diag-subbtn active" id="diag-btn-pred" onclick="switchDiagSubtab('pred')">1. AI Failure Prediction</button>
+1651:     <button class="diag-subbtn" id="diag-btn-health" onclick="switchDiagSubtab('health')">2. System Health Decomposition</button>
+1652:     <button class="diag-subbtn" id="diag-btn-topo" onclick="switchDiagSubtab('topo')">3. Subsystem Dependency Map</button>
+1653:     <button class="diag-subbtn" id="diag-btn-policy" onclick="switchDiagSubtab('policy')">4. MAPE-K Decision Policy</button>
+1654:     <button class="diag-subbtn" id="diag-btn-trace" onclick="switchDiagSubtab('trace')">5. Full Synchronized Event Trace</button>
+1655:   </div>
+1656: 
+1657:   <!-- Sub-tab 1: AI Failure Prediction (Panel 3) -->
+1658:   <div id="diag-view-pred">
+1659:     <div class="panel-card">
+1660:       <div class="panel-top">
+1661:         <span class="panel-title">Machine Learning Failure Prediction & Warning Signals</span>
+1662:         <span class="badge badge-live">[RANDOMFOREST ONLINE]</span>
+1663:       </div>
+1664:       <div style="display:grid; grid-template-columns: 240px 1fr; gap:14px; align-items:center;">
+1665:         <!-- Normalized Risk Gauge -->
+1666:         <div style="text-align:center; background:#020617; border:1px solid #1e293b; border-radius:8px; padding:14px;">
+1667:           <div style="font-size:0.72rem; color:var(--text-muted); font-weight:bold; margin-bottom:6px;">ESTIMATED FAILURE RISK</div>
+1668:           <svg width="120" height="120" viewBox="0 0 120 120" style="margin:0 auto;">

@@ -1,0 +1,150 @@
+1412: <div id="tab-recovery" style="display: none;">
+1413:   <!-- Recovery Top Control & Status Bar -->
+1414:   <div class="panel-card" style="padding:12px 16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+1415:     <div>
+1416:       <div style="font-weight:800; font-size:1.05rem; color:#fff; display:flex; align-items:center; gap:8px;">
+1417:         <span>🛡️ Autonomic Self-Healing & Process Handover Studio</span>
+1418:         <span class="badge badge-live">[LIVE SURVEILLANCE]</span>
+1419:       </div>
+1420:       <div style="color:var(--text-muted); font-size:0.75rem; margin-top:2px;">
+1421:         Closed-loop IBM MAPE-K supervision. Monitors <code>dummy_app.py</code> and recovers instances within sub-second SLA (&le; 2.50s).
+1422:       </div>
+1423:     </div>
+1424:     <div style="display:flex; gap:8px;">
+1425:       <button class="btn btn-sm btn-danger" onclick="triggerCrash()">⚡ Inject Real Process Crash</button>
+1426:     </div>
+1427:   </div>
+1428: 
+1429:   <!-- 6-Stage Handover Pipeline Visualizer -->
+1430:   <div class="panel-card">
+1431:     <div class="panel-top">
+1432:       <span class="panel-title">6-Stage Autonomic Handover Pipeline</span>
+1433:       <span style="font-size:0.75rem; color:var(--text-muted);">Real-Time Signal Propagation</span>
+1434:     </div>
+1435:     <div class="pipeline-wrapper">
+1436:       <div class="pipe-node active" id="pipe-1">1. RUNNING<br><small>dummy_app.py</small></div>
+1437:       <span class="pipe-arrow">➔</span>
+1438:       <div class="pipe-node" id="pipe-2">2. CRASH DETECTED<br><small>&lt;200ms Signal</small></div>
+1439:       <span class="pipe-arrow">➔</span>
+1440:       <div class="pipe-node" id="pipe-3">3. PID TERMINATED<br><small>PCB Freed</small></div>
+1441:       <span class="pipe-arrow">➔</span>
+1442:       <div class="pipe-node" id="pipe-4">4. POLICY DECISION<br><small>RESTART_APP</small></div>
+1443:       <span class="pipe-arrow">➔</span>
+1444:       <div class="pipe-node" id="pipe-5">5. NEW PID<br><small>fork()/exec()</small></div>
+1445:       <span class="pipe-arrow">➔</span>
+1446:       <div class="pipe-node" id="pipe-6">6. VERIFIED ALIVE<br><small>SLA &le; 2.5s</small></div>
+1447:     </div>
+1448:   </div>
+1449: 
+1450:   <!-- Forensic Instance Comparison: Original vs Replacement -->
+1451:   <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+1452:     <!-- Original Process Instance Card -->
+1453:     <div class="panel-card" style="border-color:#7f1d1d; margin-bottom:0;">
+1454:       <div class="panel-top" style="border-bottom-color:#7f1d1d;">
+1455:         <span style="font-weight:800; color:#fca5a5; font-size:0.85rem;">🔴 ORIGINAL PROCESS INSTANCE</span>
+1456:         <span class="badge badge-danger">TERMINATED</span>
+1457:       </div>
+1458:       <div class="prop-row"><span class="label">Observed PID:</span><span class="val" id="val-orig-pid" style="color:#fca5a5; font-size:1.05rem;">-</span></div>
+1459:       <div class="prop-row"><span class="label">Executable:</span><span class="val">dummy_app.py</span></div>
+1460:       <div class="prop-row"><span class="label">Crash Timestamp:</span><span class="val" id="val-orig-end">-</span></div>
+1461:       <div class="prop-row"><span class="label">Exit Code / Reason:</span><span class="val" id="val-orig-reason" style="color:#fca5a5;">Exit code 1 (SIGSEGV simulated)</span></div>
+1462:       <div class="prop-row"><span class="label">Uptime Before Crash:</span><span class="val" id="val-orig-runtime">-</span></div>
+1463:     </div>
+1464: 
+1465:     <!-- Replacement Process Instance Card -->
+1466:     <div class="panel-card" style="border-color:#065f46; margin-bottom:0;">
+1467:       <div class="panel-top" style="border-bottom-color:#065f46;">
+1468:         <span style="font-weight:800; color:#a7f3d0; font-size:0.85rem;">🟢 REPLACEMENT PROCESS INSTANCE</span>
+1469:         <span class="badge badge-success" id="val-repl-alive">● ALIVE</span>
+1470:       </div>
+1471:       <div class="prop-row"><span class="label">Allocated New PID:</span><span class="val" id="val-repl-pid" style="color:var(--accent-cyan); font-size:1.05rem;">-</span></div>
+1472:       <div class="prop-row"><span class="label">Executable:</span><span class="val">dummy_app.py</span></div>
+1473:       <div class="prop-row"><span class="label">Spawn Timestamp:</span><span class="val" id="val-repl-start">-</span></div>
+1474:       <div class="prop-row"><span class="label">Measured Recovery Latency:</span><span class="val" id="val-sla-latency" style="color:#10b981; font-weight:bold;">Pending / N/A</span></div>
+1475:       <div class="prop-row"><span class="label">SLA Verification Status:</span><span class="val" id="val-sla-status" style="color:#10b981;">Target &le; 2.50s</span></div>
+1476:     </div>
+1477:   </div>
+1478: 
+1479:   <!-- Recovery Waterfall & SLA Analytics -->
+1480:   <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+1481:     <!-- Autonomic Timing Waterfall -->
+1482:     <div class="panel-card" style="margin-bottom:0;">
+1483:       <div class="panel-top">
+1484:         <span class="panel-title">Autonomic Recovery Timing Waterfall</span>
+1485:         <span class="badge badge-live">[SUB-SECOND SLA]</span>
+1486:       </div>
+1487:       <div class="wf-bar" id="waterfall-bar">
+1488:         <div class="wf-seg" style="width: 15%; background: #0284c7;" title="Signal Detection (&le; 200ms)">Detect<br><small>&le;200ms</small></div>
+1489:         <div class="wf-seg" style="width: 10%; background: #818cf8;" title="Policy Decision (&le; 80ms)">Policy<br><small>&le;80ms</small></div>
+1490:         <div class="wf-seg" style="width: 60%; background: #059669;" title="Process Respawn & Alloc">Respawn<br><small>~800ms</small></div>
+1491:         <div class="wf-seg" style="width: 15%; background: #10b981;" title="Health Check (&le; 50ms)">Check<br><small>&le;50ms</small></div>
+1492:       </div>
+1493:       <div style="font-size:0.73rem; color:var(--text-muted); margin-top:8px;">
+1494:         Total measured duration: <b id="val-waterfall-total" style="color:#fff;">1080 ms</b> &mdash; well within the strict <b>2.50s</b> SLA limit.
+1495:       </div>
+1496:     </div>
+1497: 
+1498:     <!-- Recovery SLA Scorecard & History -->
+1499:     <div class="panel-card" style="margin-bottom:0;">
+1500:       <div class="panel-top">
+1501:         <span class="panel-title">SLA Compliance & History</span>
+1502:         <span class="badge badge-live" id="rec-compliance-badge">100% MET</span>
+1503:       </div>
+1504:       <div class="stat-grid" style="margin-bottom:8px;">
+1505:         <div class="stat-chip"><div class="num" id="rec-total-count">0</div><div class="lbl">Total Restarts</div></div>
+1506:         <div class="stat-chip"><div class="num" id="rec-success-rate">100.0%</div><div class="lbl">Success Rate</div></div>
+1507:         <div class="stat-chip"><div class="num" id="rec-avg-lat">1080 ms</div><div class="lbl">Mean Latency</div></div>
+1508:       </div>
+1509:       <div id="p5-durs-chart" style="display:flex; align-items:flex-end; gap:6px; height:45px; background:#020617; border:1px solid #1e293b; border-radius:4px; padding:4px 6px;">
+1510:         <div style="color:#64748b; font-size:0.7rem;">No recovery history recorded yet.</div>
+1511:       </div>
+1512:     </div>
+1513:   </div>
+1514: </div>
+1515: 
+1516: <!-- ========================================================================= -->
+1517: <!-- TAB 4: DEADLOCK & BANKER'S LAB -->
+1518: <!-- ========================================================================= -->
+1519: <div id="tab-deadlock" style="display: none;">
+1520:   <!-- Mode Selector Toolbar -->
+1521:   <div class="panel-card" style="padding:10px 16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+1522:     <div style="display:flex; align-items:center; gap:8px;">
+1523:       <span style="font-weight:800; font-size:0.95rem; color:#fff;">Deadlock Formation & Avoidance Studio</span>
+1524:       <span class="badge badge-sim">[SIMULATION]</span>
+1525:     </div>
+1526:     <div style="display: flex; gap: 6px;">
+1527:       <button class="btn btn-sm btn-accent" id="btn-mode-formation" onclick="setDeadlockMode('formation')">1. Deadlock Formation & Detection (Circular Wait)</button>
+1528:       <button class="btn btn-sm" id="btn-mode-banker" onclick="setDeadlockMode('banker')">2. Dijkstra's Banker's Algorithm (Avoidance)</button>
+1529:     </div>
+1530:   </div>
+1531: 
+1532:   <!-- Mode 1: Deadlock Formation Demo -->
+1533:   <div id="deadlock-formation-view">
+1534:     <div class="panel-card">
+1535:       <div class="panel-top">
+1536:         <span class="panel-title">Resource Allocation Graph (RAG) & Circular Wait Cycle</span>
+1537:         <span class="badge badge-warn" id="rag-cycle-alert" style="display:none;">CIRCULAR WAIT DEADLOCK DETECTED</span>
+1538:       </div>
+1539:       <div class="svg-box">
+1540:         <svg id="svg-rag" width="560" height="200" viewBox="0 0 560 200">
+1541:           <circle cx="120" cy="100" r="32" fill="#1e1b4b" stroke="#818cf8" stroke-width="2.5"/>
+1542:           <text x="120" y="98" fill="#e0e7ff" font-size="12" font-weight="bold" text-anchor="middle">P1</text>
+1543:           <text x="120" y="114" fill="#a5b4fc" font-size="8" text-anchor="middle" id="rag-p1-state">READY</text>
+1544: 
+1545:           <circle cx="440" cy="100" r="32" fill="#1e1b4b" stroke="#818cf8" stroke-width="2.5"/>
+1546:           <text x="440" y="98" fill="#e0e7ff" font-size="12" font-weight="bold" text-anchor="middle">P2</text>
+1547:           <text x="440" y="114" fill="#a5b4fc" font-size="8" text-anchor="middle" id="rag-p2-state">READY</text>
+1548: 
+1549:           <rect x="255" y="20" width="50" height="40" rx="6" fill="#164e63" stroke="#06b6d4" stroke-width="2"/>
+1550:           <text x="280" y="42" fill="#a5f3fc" font-size="10" font-weight="bold" text-anchor="middle">R1</text>
+1551: 
+1552:           <rect x="255" y="140" width="50" height="40" rx="6" fill="#164e63" stroke="#06b6d4" stroke-width="2"/>
+1553:           <text x="280" y="162" fill="#a5f3fc" font-size="10" font-weight="bold" text-anchor="middle">R2</text>
+1554: 
+1555:           <line id="edge-r1-p1" x1="255" y1="40" x2="152" y2="85" stroke="#334155" stroke-width="2"/>
+1556:           <line id="edge-r2-p2" x1="305" y1="160" x2="408" y2="115" stroke="#334155" stroke-width="2"/>
+1557:           <line id="edge-p1-r2" x1="152" y1="115" x2="255" y2="160" stroke="#334155" stroke-width="2" stroke-dasharray="3,3"/>
+1558:           <line id="edge-p2-r1" x1="408" y1="85" x2="305" y2="40" stroke="#334155" stroke-width="2" stroke-dasharray="3,3"/>
+1559:         </svg>
+1560:       </div>
+1561: 

@@ -1,0 +1,300 @@
+3336: function updateSchVisualsAtTick(tick) {
+3337:   const sch = schState.data;
+3338:   if (!sch) return;
+3339:   const maxDuration = sch.total_duration || 12;
+3340:   tick = Math.max(0, Math.min(maxDuration, tick));
+3341:   schState.currentTick = tick;
+3342: 
+3343:   // Clock
+3344:   document.getElementById('sch-clock-val').innerText = `t = ${tick}`;
+3345: 
+3346:   // Get tick record from timeline_ticks
+3347:   let tickData = null;
+3348:   if (sch.timeline_ticks && sch.timeline_ticks[tick]) {
+3349:     tickData = sch.timeline_ticks[tick];
+3350:   } else {
+3351:     tickData = {
+3352:       active_process: null,
+3353:       ready_queue: [],
+3354:       remaining_burst: {},
+3355:       states: {},
+3356:       decision_reason: `t = ${tick}: Scheduler simulation nominal.`,
+3357:       is_context_switch: false
+3358:     };
+3359:   }
+3360: 
+3361:   // Sound triggers
+3362:   if (tickData.active_process && tickData.active_process !== schState.lastActiveJob) {
+3363:     playTone('RUNNING');
+3364:   }
+3365:   if (tickData.is_context_switch) {
+3366:     playTone('BLOCKED');
+3367:   }
+3368:   schState.lastActiveJob = tickData.active_process;
+3369: 
+3370:   // Decision banner
+3371:   const decBanner = document.getElementById('sch-decision-banner');
+3372:   if (decBanner) {
+3373:     decBanner.innerText = tickData.decision_reason || `t = ${tick}: Scheduler tick advanced.`;
+3374:   }
+3375: 
+3376:   // CPU Socket Visual
+3377:   const cpuSocket = document.getElementById('cpu-socket-element');
+3378:   const cpuExecLbl = document.getElementById('cpu-exec-label');
+3379:   const cpuExecBurst = document.getElementById('cpu-exec-burst');
+3380:   if (cpuSocket && cpuExecLbl && cpuExecBurst) {
+3381:     if (tickData.active_process) {
+3382:       cpuSocket.className = 'cpu-socket-box running';
+3383:       cpuExecLbl.innerText = tickData.active_process;
+3384:       cpuExecLbl.style.color = '#34d399';
+3385:       const rem = tickData.remaining_burst ? tickData.remaining_burst[tickData.active_process] : 0;
+3386:       cpuExecBurst.innerText = `Executing • Remaining: ${rem}t`;
+3387:       cpuExecBurst.style.color = '#6ee7b7';
+3388:     } else {
+3389:       cpuSocket.className = 'cpu-socket-box idle';
+3390:       cpuExecLbl.innerText = 'IDLE CPU';
+3391:       cpuExecLbl.style.color = '#94a3b8';
+3392:       cpuExecBurst.innerText = 'No Job Ready in Queue';
+3393:       cpuExecBurst.style.color = '#64748b';
+3394:     }
+3395:   }
+3396: 
+3397:   // Ready Queue Strip
+3398:   const rqContainer = document.getElementById('ready-queue-container');
+3399:   const rqCount = document.getElementById('ready-queue-count');
+3400:   const readyList = tickData.ready_queue || [];
+3401:   if (rqCount) rqCount.innerText = `${readyList.length} ready`;
+3402:   if (rqContainer) {
+3403:     rqContainer.innerHTML = '';
+3404:     if (readyList.length === 0) {
+3405:       rqContainer.innerHTML = '<span style="color:#64748b; font-size:0.74rem;">Ready Queue is empty at this tick.</span>';
+3406:     } else {
+3407:       readyList.forEach((job, idx) => {
+3408:         if (idx > 0) {
+3409:           const arr = document.createElement('span');
+3410:           arr.style.color = '#475569';
+3411:           arr.innerText = '➔';
+3412:           rqContainer.appendChild(arr);
+3413:         }
+3414:         const item = document.createElement('div');
+3415:         const isSelected = schState.selectedJob === job;
+3416:         item.className = 'ready-queue-item' + (isSelected ? ' proc-highlight' : '');
+3417:         item.style.cursor = 'pointer';
+3418:         item.onclick = () => highlightJob(job);
+3419:         const rem = tickData.remaining_burst ? tickData.remaining_burst[job] : '-';
+3420:         item.innerHTML = `<span>${job}</span><small style="color:#67e8f9;">(BT:${rem})</small>`;
+3421:         rqContainer.appendChild(item);
+3422:       });
+3423:     }
+3424:   }
+3425: 
+3426:   // Render Gantt Timeline Lanes with moving playhead cursor
+3427:   const lanesOut = document.getElementById('lanes-output');
+3428:   if (lanesOut) {
+3429:     lanesOut.innerHTML = '';
+3430:     const procs = sch.raw_processes || [];
+3431:     const gantt = sch.gantt || [];
+3432: 
+3433:     procs.forEach(p => {
+3434:       const lbl = p.label;
+3435:       const isSelected = schState.selectedJob === lbl;
+3436:       const row = document.createElement('div');
+3437:       row.style.display = 'flex';
+3438:       row.style.alignItems = 'center';
+3439:       row.style.height = '28px';
+3440:       row.style.marginBottom = '4px';
+3441: 
+3442:       const lblDiv = document.createElement('div');
+3443:       lblDiv.style.width = '70px';
+3444:       lblDiv.style.fontWeight = 'bold';
+3445:       lblDiv.style.fontSize = '0.76rem';
+3446:       lblDiv.style.color = isSelected ? '#fbbf24' : '#e2e8f0';
+3447:       lblDiv.style.cursor = 'pointer';
+3448:       lblDiv.innerText = lbl;
+3449:       lblDiv.onclick = () => highlightJob(lbl);
+3450:       row.appendChild(lblDiv);
+3451: 
+3452:       const track = document.createElement('div');
+3453:       track.style.display = 'flex';
+3454:       track.style.flex = '1';
+3455:       track.style.height = '100%';
+3456:       track.style.background = '#0b1120';
+3457:       track.style.position = 'relative';
+3458:       track.style.borderRadius = '3px';
+3459:       track.style.overflow = 'hidden';
+3460: 
+3461:       let pos = 0;
+3462:       gantt.forEach((b) => {
+3463:         if (b.label === lbl) {
+3464:           if (b.start > pos) {
+3465:             const sp = document.createElement('div');
+3466:             sp.style.width = ((b.start - pos) / maxDuration * 100) + '%';
+3467:             track.appendChild(sp);
+3468:           }
+3469:           const blk = document.createElement('div');
+3470:           blk.style.width = ((b.end - b.start) / maxDuration * 100) + '%';
+3471:           blk.style.height = '22px';
+3472:           blk.style.margin = '2px 0';
+3473:           blk.style.borderRadius = '3px';
+3474:           blk.style.display = 'flex';
+3475:           blk.style.alignItems = 'center';
+3476:           blk.style.justifyContent = 'center';
+3477:           blk.style.fontSize = '0.68rem';
+3478:           blk.style.fontWeight = '700';
+3479:           blk.style.cursor = 'pointer';
+3480:           blk.onclick = () => highlightJob(lbl);
+3481: 
+3482:           // State of block relative to current tick
+3483:           if (b.end <= tick) {
+3484:             // Completed slice
+3485:             blk.style.background = isSelected ? '#d97706' : '#0891b2';
+3486:             blk.style.border = isSelected ? '1px solid #fbbf24' : '1px solid #06b6d4';
+3487:             blk.style.color = '#fff';
+3488:             blk.title = `${lbl} executed [${b.start} -> ${b.end}]`;
+3489:           } else if (b.start < tick && b.end > tick) {
+3490:             // Currently executing slice on CPU
+3491:             blk.style.background = '#059669';
+3492:             blk.style.border = '2px solid #34d399';
+3493:             blk.style.color = '#fff';
+3494:             blk.style.boxShadow = '0 0 8px #34d399';
+3495:             blk.title = `${lbl} active on CPU now [${b.start} -> ${b.end}]`;
+3496:           } else {
+3497:             // Future slice
+3498:             blk.style.background = 'rgba(8, 145, 178, 0.15)';
+3499:             blk.style.border = '1px dashed #334155';
+3500:             blk.style.color = '#64748b';
+3501:             blk.title = `${lbl} future slice [${b.start} -> ${b.end}]`;
+3502:           }
+3503: 
+3504:           blk.innerText = (b.end - b.start) + 't';
+3505:           track.appendChild(blk);
+3506:           pos = b.end;
+3507:         }
+3508:       });
+3509:       row.appendChild(track);
+3510:       lanesOut.appendChild(row);
+3511:     });
+3512: 
+3513:     // Update playhead cursor position
+3514:     const cursor = document.getElementById('timeline-cursor');
+3515:     if (cursor) {
+3516:       const containerW = lanesOut.clientWidth - 70;
+3517:       if (containerW > 0) {
+3518:         const leftPos = 70 + (tick / maxDuration) * containerW;
+3519:         cursor.style.left = leftPos + 'px';
+3520:       }
+3521:     }
+3522: 
+3523:     // Render time axis
+3524:     const axis = document.getElementById('gantt-time-axis');
+3525:     if (axis) {
+3526:       axis.innerHTML = '';
+3527:       const step = Math.max(1, Math.round(maxDuration / 10));
+3528:       for (let t = 0; t <= maxDuration; t += step) {
+3529:         const tickMark = document.createElement('div');
+3530:         tickMark.style.position = 'absolute';
+3531:         tickMark.style.left = ((t / maxDuration) * 100) + '%';
+3532:         tickMark.style.fontSize = '0.65rem';
+3533:         tickMark.style.color = '#64748b';
+3534:         tickMark.style.transform = 'translateX(-50%)';
+3535:         tickMark.innerText = t + 't';
+3536:         axis.appendChild(tickMark);
+3537:       }
+3538:     }
+3539:   }
+3540: 
+3541:   // Live Process Metrics & Remaining Burst Progress Table
+3542:   const tbody = document.getElementById('tbody-proc-metrics');
+3543:   if (tbody) {
+3544:     tbody.innerHTML = '';
+3545:     const procs = sch.raw_processes || [];
+3546:     procs.forEach(p => {
+3547:       const lbl = p.label;
+3548:       const isSelected = schState.selectedJob === lbl;
+3549:       const state = (tickData.states && tickData.states[lbl]) ? tickData.states[lbl] : 'READY';
+3550:       const rem = (tickData.remaining_burst && tickData.remaining_burst[lbl] !== undefined) ? tickData.remaining_burst[lbl] : p.burst_time;
+3551:       const total = p.burst_time;
+3552:       const pct = Math.max(0, Math.min(100, (rem / total) * 100));
+3553: 
+3554:       let stateBadge = `<span class="badge" style="background:#083344; color:#38bdf8;">READY</span>`;
+3555:       if (state === 'RUNNING') stateBadge = `<span class="badge" style="background:#064e3b; color:#34d399; font-weight:800;">RUNNING</span>`;
+3556:       else if (state === 'TERMINATED') stateBadge = `<span class="badge" style="background:#450a0a; color:#fca5a5;">TERMINATED</span>`;
+3557:       else if (state === 'NEW') stateBadge = `<span class="badge" style="background:#3b0764; color:#c084fc;">NEW</span>`;
+3558: 
+3559:       // Find metrics in sch.process_metrics
+3560:       const m = (sch.process_metrics || []).find(pm => (pm.label === lbl || pm.pid === p.pid)) || {};
+3561: 
+3562:       const tr = document.createElement('tr');
+3563:       tr.style.borderBottom = '1px solid #1e293b';
+3564:       tr.style.cursor = 'pointer';
+3565:       if (isSelected) tr.className = 'proc-highlight';
+3566:       tr.onclick = () => highlightJob(lbl);
+3567: 
+3568:       tr.innerHTML = `
+3569:         <td style="padding:4px 6px; font-weight:bold; color:${isSelected ? '#fbbf24' : '#e2e8f0'};">${lbl}</td>
+3570:         <td style="padding:4px 6px;">${stateBadge}</td>
+3571:         <td style="padding:4px 6px; font-family:monospace;">${p.arrival_time}</td>
+3572:         <td style="padding:4px 6px; font-family:monospace;">${total}t</td>
+3573:         <td style="padding:4px 6px;">
+3574:           <div style="display:flex; align-items:center; gap:6px;">
+3575:             <div style="flex:1; height:6px; background:#1e293b; border-radius:3px; overflow:hidden;">
+3576:               <div style="width:${pct}%; height:100%; background:${state === 'RUNNING' ? 'var(--accent-green)' : (state === 'TERMINATED' ? '#475569' : 'var(--accent-cyan)')}; transition:width 0.2s;"></div>
+3577:             </div>
+3578:             <span style="font-family:monospace; font-size:0.7rem; color:${state === 'TERMINATED' ? '#64748b' : '#a5f3fc'}; width:32px;">${rem}/${total}</span>
+3579:           </div>
+3580:         </td>
+3581:         <td style="padding:4px 6px; font-family:monospace;">${p.priority}</td>
+3582:         <td style="padding:4px 6px; font-family:monospace;">${m.completion_time !== undefined ? m.completion_time + 't' : '-'}</td>
+3583:         <td style="padding:4px 6px; font-family:monospace;">${m.turnaround_time !== undefined ? m.turnaround_time + 't' : '-'}</td>
+3584:         <td style="padding:4px 6px; font-family:monospace;">${m.waiting_time !== undefined ? m.waiting_time + 't' : '-'}</td>
+3585:         <td style="padding:4px 6px; font-family:monospace;">${m.response_time !== undefined ? m.response_time + 't' : '-'}</td>
+3586:       `;
+3587:       tbody.appendChild(tr);
+3588:     });
+3589:   }
+3590: }
+3591: 
+3592: function schStep(delta) {
+3593:   if (!schState.data) return;
+3594:   const maxDuration = schState.data.total_duration || 12;
+3595:   const newTick = Math.max(0, Math.min(maxDuration, schState.currentTick + delta));
+3596:   updateSchVisualsAtTick(newTick);
+3597:   if (newTick >= maxDuration && schState.isPlaying) {
+3598:     schTogglePlay();
+3599:   }
+3600: }
+3601: 
+3602: function schTogglePlay() {
+3603:   schState.isPlaying = !schState.isPlaying;
+3604:   const btn = document.getElementById('btn-sch-play');
+3605:   if (btn) {
+3606:     btn.innerText = schState.isPlaying ? '⏸ Pause' : '▶ Play';
+3607:     btn.className = 'btn btn-sm' + (schState.isPlaying ? ' btn-purple' : ' btn-accent');
+3608:   }
+3609:   if (schState.timer) {
+3610:     clearInterval(schState.timer);
+3611:     schState.timer = null;
+3612:   }
+3613:   if (schState.isPlaying) {
+3614:     if (schState.data && schState.currentTick >= schState.data.total_duration) {
+3615:       schState.currentTick = 0;
+3616:     }
+3617:     schState.timer = setInterval(() => {
+3618:       schStep(1);
+3619:     }, schState.playInterval);
+3620:   }
+3621: }
+3622: 
+3623: function schResetTick() {
+3624:   if (schState.isPlaying) schTogglePlay();
+3625:   updateSchVisualsAtTick(0);
+3626: }
+3627: 
+3628: function setSchSpeed(ms, label) {
+3629:   schState.playInterval = ms;
+3630:   ['05', '1', '2'].forEach(l => {
+3631:     const b = document.getElementById('btn-speed-' + l);
+3632:     if (b) b.className = 'btn btn-sm' + (l === label ? ' btn-accent' : '');
+3633:   });
+3634:   if (schState.isPlaying) {
+3635:     clearInterval(schState.timer);

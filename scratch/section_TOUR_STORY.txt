@@ -1,0 +1,80 @@
+2001: const TOUR_STORY = [
+2002:   { step: 1, tab: 'overview', title: "Step 1/8: Executive System Overview", desc: "Live KPI summary: Host CPU/RAM load, health score (0-100), managed dummy_app.py surveillance, and SLA status.", action: null },
+2003:   { step: 2, tab: 'process-lab', title: "Step 2/8: Process Creation & Simulated PID Allocation", desc: "Form initializes PCB in kernel memory; assigns simulated PID (P101-P999) via sys_create() pipeline.", action: "reset_lifecycle" },
+2004:   { step: 3, tab: 'process-lab', title: "Step 3/8: CPU Scheduling & Gantt Execution", desc: "Short-term scheduler dispatches jobs across RR, FCFS, SJF, and Priority with live playhead cursor.", action: "set_lifecycle_algo", data: { algo: "RR", quantum: 2 } },
+2005:   { step: 4, tab: 'recovery', title: "Step 4/8: Crash Detection & Signal Handover", desc: "Fault injection in managed process triggers SIGSEGV / crash detection in <200ms without shell execution.", action: null },
+2006:   { step: 5, tab: 'recovery', title: "Step 5/8: Autonomic Recovery Decision & Replacement PID", desc: "MAPE-K decision engine selects RESTART_APPLICATION; spawns new process with fresh observed PID.", action: "trigger_crash" },
+2007:   { step: 6, tab: 'deadlock', title: "Step 6/8: Deadlock Formation (Circular Wait)", desc: "P1 holds R1, requests R2; P2 holds R2, requests R1. Circular dependency detected by Wait-For Graph.", action: "step_two_process_deadlock" },
+2008:   { step: 7, tab: 'deadlock', title: "Step 7/8: Deadlock Avoidance (Dijkstra's Banker's Algorithm)", desc: "Evaluates Need matrix against Available vector; proves safe sequence or rejects unsafe claims.", action: "evaluate_banker_request", data: { pid: 0, request: [0, 2, 0] } },
+2009:   { step: 8, tab: 'diagnostics', title: "Step 8/8: Diagnostics, AI Prediction & Event Trace", desc: "Machine Learning failure prediction (0-100%), component health decomposition, subsystem map, and audit log.", action: null }
+2010: ];
+2011: 
+2012: function goToTourStep(s) {
+2013:   currentTourStep = s;
+2014:   const item = TOUR_STORY[s - 1];
+2015:   const titleEl = document.getElementById('tour-title');
+2016:   const descEl = document.getElementById('tour-desc');
+2017:   if (titleEl) titleEl.innerText = item.title;
+2018:   if (descEl) descEl.innerText = item.desc;
+2019:   
+2020:   // Switch to the relevant tab
+2021:   if (item.tab) {
+2022:     switchMainTab(item.tab);
+2023:   }
+2024:   
+2025:   if (item.action) {
+2026:     postAction(item.action, item.data || {});
+2027:   }
+2028:   postAction('step_demo', { step: s });
+2029: }
+2030: 
+2031: 
+2032: let currentWorkspace = 1;
+2033: let currentTourStep = 1;
+2034: let autoTourInterval = null;
+2035: let currentTraceFilter = 'ALL';
+2036: let schedulerComparisonOpen = false;
+2037: let globalData = null;
+2038: let activeCursorTick = 0;
+2039: let resourceRangeSeconds = 60;
+2040: 
+2041: // Web Audio API Synthesizer (Optional, Muted by Default)
+2042: let soundEnabled = false;
+2043: let soundVolume = 0.3;
+2044: let audioCtx = null;
+2045: 
+2046: function ensureAudioContext() {
+2047:   if (!audioCtx) {
+2048:     const AudioContext = window.AudioContext || window.webkitAudioContext;
+2049:     if (AudioContext) audioCtx = new AudioContext();
+2050:   }
+2051:   if (audioCtx && audioCtx.state === 'suspended') {
+2052:     audioCtx.resume();
+2053:   }
+2054: }
+2055: 
+2056: function toggleSound() {
+2057:   ensureAudioContext();
+2058:   soundEnabled = !soundEnabled;
+2059:   const btn = document.getElementById('btn-sound-toggle');
+2060:   if (btn) {
+2061:     btn.innerText = soundEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+2062:     btn.className = soundEnabled ? 'btn btn-sm btn-accent' : 'btn btn-sm';
+2063:   }
+2064:   if (soundEnabled) {
+2065:     playTone('RUNNING');
+2066:   }
+2067: }
+2068: 
+2069: function setSoundVolume(val) {
+2070:   soundVolume = Math.max(0, Math.min(1, parseFloat(val)));
+2071:   const lbl = document.getElementById('sound-vol-label');
+2072:   if (lbl) lbl.innerText = Math.round(soundVolume * 100) + '%';
+2073: }
+2074: 
+2075: function playTone(type) {
+2076:   if (!soundEnabled) return;
+2077:   try {
+2078:     ensureAudioContext();
+2079:     if (!audioCtx) return;
+2080:     const now = audioCtx.currentTime;

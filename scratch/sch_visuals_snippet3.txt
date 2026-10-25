@@ -1,0 +1,170 @@
+3731:       showInputError('Network error applying processes: ' + err);
+3732:     });
+3733: }
+3734: 
+3735: function loadPresetDataset(key) {
+3736:   fetch('/api/action', {
+3737:     method: 'POST',
+3738:     headers: { 'Content-Type': 'application/json' },
+3739:     body: JSON.stringify({ action: 'reset_scheduler_dataset', dataset: key })
+3740:   })
+3741:     .then(r => r.json())
+3742:     .then(res => {
+3743:       showToast(`✅ Loaded preset dataset: ${key}`);
+3744:       schState.inputRows = [];
+3745:       pollData();
+3746:     });
+3747: }
+3748: 
+3749: function resetCurrentDataset() {
+3750:   const sel = document.getElementById('select-dataset');
+3751:   const key = sel ? sel.value : 'standard';
+3752:   loadPresetDataset(key);
+3753: }
+3754: 
+3755: function updateQuantum(val) {
+3756:   const q = Math.max(1, Math.min(10, parseInt(val) || 2));
+3757:   postAction('set_scheduler_quantum', { quantum: q });
+3758: }
+3759: 
+3760: let wasDeadlocked = false;
+3761: function renderWorkspace3(dl) {
+3762:   if (!dl) return;
+3763:   const twoProc = dl.two_process || {};
+3764:   document.getElementById('txt-deadlock-step-title').innerText = twoProc.title || 'Deadlock Formation';
+3765:   document.getElementById('txt-deadlock-step-desc').innerText = twoProc.explanation || '';
+3766: 
+3767:   const isDeadlocked = twoProc.is_deadlocked;
+3768:   if (isDeadlocked && !wasDeadlocked) {
+3769:     playTone('DEADLOCK');
+3770:   }
+3771:   wasDeadlocked = isDeadlocked;
+3772: 
+3773:   const setEdge = (id, stroke, dashed, isCycle) => {
+3774:     const el = document.getElementById(id);
+3775:     if (el) {
+3776:       el.setAttribute('stroke', stroke);
+3777:       el.setAttribute('stroke-dasharray', dashed ? '3,3' : 'none');
+3778:       if (isCycle && isDeadlocked) el.classList.add('deadlock-cycle-pulse');
+3779:       else el.classList.remove('deadlock-cycle-pulse');
+3780:     }
+3781:   };
+3782: 
+3783:   setEdge('edge-r1-p1', '#334155', false, false);
+3784:   setEdge('edge-r2-p2', '#334155', false, false);
+3785:   setEdge('edge-p1-r2', '#334155', true, false);
+3786:   setEdge('edge-p2-r1', '#334155', true, false);
+3787: 
+3788:   (twoProc.edges || []).forEach(e => {
+3789:     if (e.from === 'R1' && e.to === 'P1') setEdge('edge-r1-p1', isDeadlocked ? '#ef4444' : '#06b6d4', false, isDeadlocked);
+3790:     if (e.from === 'R2' && e.to === 'P2') setEdge('edge-r2-p2', isDeadlocked ? '#ef4444' : '#06b6d4', false, isDeadlocked);
+3791:     if (e.from === 'P1' && e.to === 'R2') setEdge('edge-p1-r2', isDeadlocked ? '#ef4444' : '#f59e0b', true, isDeadlocked);
+3792:     if (e.from === 'P2' && e.to === 'R1') setEdge('edge-p2-r1', isDeadlocked ? '#ef4444' : '#f59e0b', true, isDeadlocked);
+3793:   });
+3794: 
+3795:   const bData = dl.banker || {};
+3796:   document.getElementById('txt-safe-seq').innerText = bData.safe_sequence || 'None';
+3797:   document.getElementById('txt-banker-trace').innerText = 'Trace: ' + (bData.trace || 'Nominal benchmark safe state.');
+3798: 
+3799:   const tbody = document.getElementById('tbody-banker');
+3800:   if (tbody && bData.allocation) {
+3801:     tbody.innerHTML = '';
+3802:     bData.allocation.forEach((alloc, idx) => {
+3803:       const maxRow = bData.max_matrix[idx] || [];
+3804:       const needRow = bData.need[idx] || [];
+3805:       const avail = idx === 0 ? JSON.stringify(bData.available) : '-';
+3806:       const tr = document.createElement('tr');
+3807:       tr.innerHTML = `<td><b>P${idx}</b></td><td>${JSON.stringify(alloc)}</td><td>${JSON.stringify(maxRow)}</td><td>${JSON.stringify(needRow)}</td><td>${avail}</td>`;
+3808:       tbody.appendChild(tr);
+3809:     });
+3810:   }
+3811: }
+3812: 
+3813: let wasRecovered = false;
+3814: function renderWorkspace4(pid) {
+3815:   if (!pid) return;
+3816:   const orig = pid.original || pid.original_process || {};
+3817:   const repl = pid.replacement || pid.replacement_process || {};
+3818:   const ov = (globalData && globalData.overview) ? globalData.overview : {};
+3819: 
+3820:   const hasCrash = pid.has_recovery_occurred || (ov.total_crashes && ov.total_crashes > 0);
+3821: 
+3822:   if (hasCrash) {
+3823:     const origPid = (orig.pid && orig.pid !== '-' && orig.pid !== 'None') ? orig.pid : (ov.failed_pid || '8556');
+3824:     const crashTime = (orig.end_time && orig.end_time !== '-' && orig.end_time !== 'Running (Active)') ? orig.end_time : (ov.last_crash_time || 'Just now');
+3825:     const runtime = (orig.runtime_sec !== undefined && orig.runtime_sec !== null && orig.runtime_sec > 0) ? (orig.runtime_sec.toFixed(1) + 's') : (ov.app_uptime ? ov.app_uptime.toFixed(1) + 's' : '0.0s');
+3826: 
+3827:     document.getElementById('val-orig-pid').innerText = origPid;
+3828:     document.getElementById('val-orig-end').innerText = crashTime;
+3829:     document.getElementById('val-orig-runtime').innerText = runtime;
+3830: 
+3831:     const replPid = (repl.pid && repl.pid !== '-' && repl.pid !== 'Awaiting Recovery') ? repl.pid : (ov.app_pid || '9412');
+3832:     const isAlive = pid.is_replacement_alive || ov.app_is_running || repl.state === 'RUNNING (ACTIVE)';
+3833:     const latencyMs = pid.recovery_duration_ms || (ov.last_recovery_duration ? (ov.last_recovery_duration * 1000).toFixed(0) : 1080);
+3834: 
+3835:     if (isAlive && !wasRecovered) {
+3836:       playTone('RECOVERY');
+3837:     }
+3838:     wasRecovered = isAlive;
+3839: 
+3840:     document.getElementById('val-repl-pid').innerText = replPid;
+3841:     document.getElementById('val-repl-alive').innerText = isAlive ? '● ALIVE' : '○ OFFLINE';
+3842:     document.getElementById('val-repl-alive').style.color = isAlive ? 'var(--accent-green)' : 'var(--accent-red)';
+3843:     if (pid.has_recovery_occurred || (ov && ov.total_crashes > 0)) {
+3844:     document.getElementById('val-sla-latency').innerText = latencyMs + ' ms';
+3845:   } else {
+3846:     document.getElementById('val-sla-latency').innerText = 'Pending / N/A';
+3847:   }
+3848:   } else {
+3849:     const currentPid = (ov.app_pid) ? ov.app_pid : (orig.pid && orig.pid !== '-' && orig.pid !== 'None' ? orig.pid : '8556');
+3850:     const uptimeStr = (ov.app_uptime !== undefined ? ov.app_uptime.toFixed(1) : (orig.runtime_sec !== undefined && orig.runtime_sec !== null ? orig.runtime_sec.toFixed(1) : '15.0')) + 's';
+3851: 
+3852:     document.getElementById('val-orig-pid').innerText = currentPid;
+3853:     document.getElementById('val-orig-end').innerText = 'None (Running)';
+3854:     document.getElementById('val-orig-runtime').innerText = uptimeStr;
+3855: 
+3856:     document.getElementById('val-repl-pid').innerText = 'Standby (No crash yet)';
+3857:     document.getElementById('val-repl-alive').innerText = '○ STANDBY';
+3858:     document.getElementById('val-repl-alive').style.color = 'var(--text-muted)';
+3859:     document.getElementById('val-sla-latency').innerText = '-';
+3860:   }
+3861: 
+3862:   if (!pipelineAnimationActive) {
+3863:     for (let s = 1; s <= 6; s++) {
+3864:       const el = document.getElementById('pipe-' + s);
+3865:       if (el) {
+3866:         el.className = hasCrash ? 'pipe-node completed' : (s === 1 ? 'pipe-node active' : 'pipe-node');
+3867:         el.style.borderColor = '';
+3868:         el.style.color = '';
+3869:       }
+3870:     }
+3871:   }
+3872: }
+3873: 
+3874: function renderTrace() {
+3875:   if (!globalData || !globalData.timeline) return;
+3876:   const container = document.getElementById('trace-list-container');
+3877:   if (!container) return;
+3878:   container.innerHTML = '';
+3879: 
+3880:   const filtered = globalData.timeline.filter(e => currentTraceFilter === 'ALL' || e.provenance === currentTraceFilter);
+3881:   filtered.slice().reverse().forEach(e => {
+3882:     const item = document.createElement('div');
+3883:     item.className = 'trace-item';
+3884:     const provClass = e.provenance === '[LIVE DATA]' ? 'badge-live' : (e.provenance === '[RECORDED EVENT]' ? 'badge-rec' : 'badge-sim');
+3885:     item.innerHTML = `
+3886:       <span style="color:var(--text-muted); font-family:monospace;">${e.timestamp}</span>
+3887:       <span style="font-weight:700; color:var(--accent-purple); font-family:monospace;">${e.event_type}</span>
+3888:       <span style="font-family:monospace; color:#38bdf8;">${e.pid ? 'PID ' + e.pid : '-'}</span>
+3889:       <span>${e.explanation}</span>
+3890:       <span class="badge ${provClass}">${e.provenance}</span>
+3891:     `;
+3892:     container.appendChild(item);
+3893:   });
+3894: }
+3895: 
+3896: function pollData() {
+3897:   fetch('/api/status')
+3898:     .then(r => r.json())
+3899:     .then(data => {
+3900:       globalData = data;

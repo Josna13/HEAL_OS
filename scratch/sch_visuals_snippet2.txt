@@ -1,0 +1,170 @@
+3631:     const b = document.getElementById('btn-speed-' + l);
+3632:     if (b) b.className = 'btn btn-sm' + (l === label ? ' btn-accent' : '');
+3633:   });
+3634:   if (schState.isPlaying) {
+3635:     clearInterval(schState.timer);
+3636:     schState.timer = setInterval(() => { schStep(1); }, schState.playInterval);
+3637:   }
+3638: }
+3639: 
+3640: function highlightJob(lbl) {
+3641:   schState.selectedJob = (schState.selectedJob === lbl) ? null : lbl;
+3642:   updateSchVisualsAtTick(schState.currentTick);
+3643: }
+3644: 
+3645: // Process Input Table Editor Functions
+3646: function toggleProcessInputDrawer() {
+3647:   const el = document.getElementById('process-input-drawer');
+3648:   const btn = document.getElementById('btn-toggle-inputs');
+3649:   if (!el) return;
+3650:   const isOpen = (el.style.display !== 'none');
+3651:   el.style.display = isOpen ? 'none' : 'block';
+3652:   if (btn) btn.innerText = isOpen ? '✏️ Edit Process Inputs' : '✕ Close Inputs Editor';
+3653: }
+3654: 
+3655: function renderInputRows() {
+3656:   const tbody = document.getElementById('tbody-proc-inputs');
+3657:   if (!tbody) return;
+3658:   tbody.innerHTML = '';
+3659:   schState.inputRows.forEach((row, idx) => {
+3660:     const tr = document.createElement('tr');
+3661:     tr.style.borderBottom = '1px solid #1e293b';
+3662:     tr.innerHTML = `
+3663:       <td style="padding:4px;"><input type="text" value="${row.label}" style="width:70px; background:#0f172a; border:1px solid #334155; color:#fff; border-radius:3px; padding:2px 4px; font-weight:bold;" onchange="updateInputCell(${idx}, 'label', this.value)"></td>
+3664:       <td style="padding:4px;"><input type="number" min="0" max="100" value="${row.arrival_time}" style="width:65px; background:#0f172a; border:1px solid #334155; color:#fff; border-radius:3px; padding:2px 4px;" onchange="updateInputCell(${idx}, 'arrival_time', parseInt(this.value)||0)"></td>
+3665:       <td style="padding:4px;"><input type="number" min="1" max="100" value="${row.burst_time}" style="width:65px; background:#0f172a; border:1px solid #334155; color:#fff; border-radius:3px; padding:2px 4px;" onchange="updateInputCell(${idx}, 'burst_time', parseInt(this.value)||1)"></td>
+3666:       <td style="padding:4px;"><input type="number" min="1" max="10" value="${row.priority}" style="width:55px; background:#0f172a; border:1px solid #334155; color:#fff; border-radius:3px; padding:2px 4px;" onchange="updateInputCell(${idx}, 'priority', parseInt(this.value)||1)"></td>
+3667:       <td style="padding:4px; text-align:center;"><button class="btn btn-sm btn-danger" style="padding:2px 6px; font-size:0.65rem;" onclick="removeProcessRow(${idx})" ${schState.inputRows.length <= 1 ? 'disabled' : ''}>✕</button></td>
+3668:     `;
+3669:     tbody.appendChild(tr);
+3670:   });
+3671: }
+3672: 
+3673: function updateInputCell(idx, field, val) {
+3674:   if (schState.inputRows[idx]) {
+3675:     schState.inputRows[idx][field] = val;
+3676:   }
+3677: }
+3678: 
+3679: function addProcessRow() {
+3680:   if (schState.inputRows.length >= 10) {
+3681:     showInputError('Maximum of 10 processes allowed.');
+3682:     return;
+3683:   }
+3684:   const nextIdx = schState.inputRows.length + 1;
+3685:   schState.inputRows.push({
+3686:     label: 'P' + nextIdx,
+3687:     arrival_time: nextIdx - 1,
+3688:     burst_time: 4,
+3689:     priority: nextIdx
+3690:   });
+3691:   renderInputRows();
+3692: }
+3693: 
+3694: function removeProcessRow(idx) {
+3695:   if (schState.inputRows.length <= 1) return;
+3696:   schState.inputRows.splice(idx, 1);
+3697:   renderInputRows();
+3698: }
+3699: 
+3700: function showInputError(msg) {
+3701:   const el = document.getElementById('input-error-msg');
+3702:   if (el) {
+3703:     el.innerText = msg;
+3704:     el.style.display = 'block';
+3705:     setTimeout(() => { el.style.display = 'none'; }, 4000);
+3706:   }
+3707: }
+3708: 
+3709: function applyCustomProcesses() {
+3710:   if (schState.inputRows.length === 0) {
+3711:     showInputError('Process list cannot be empty.');
+3712:     return;
+3713:   }
+3714:   fetch('/api/action', {
+3715:     method: 'POST',
+3716:     headers: { 'Content-Type': 'application/json' },
+3717:     body: JSON.stringify({ action: 'set_custom_scheduler_processes', processes: schState.inputRows })
+3718:   })
+3719:     .then(r => r.json())
+3720:     .then(res => {
+3721:       if (res.status === 'ok') {
+3722:         showToast('✅ Scheduler updated with custom process specifications.');
+3723:         document.getElementById('input-error-msg').style.display = 'none';
+3724:         toggleProcessInputDrawer();
+3725:         pollData();
+3726:       } else {
+3727:         showInputError('Validation error: ' + (res.message || 'Invalid process parameters'));
+3728:       }
+3729:     })
+3730:     .catch(err => {
+3731:       showInputError('Network error applying processes: ' + err);
+3732:     });
+3733: }
+3734: 
+3735: function loadPresetDataset(key) {
+3736:   fetch('/api/action', {
+3737:     method: 'POST',
+3738:     headers: { 'Content-Type': 'application/json' },
+3739:     body: JSON.stringify({ action: 'reset_scheduler_dataset', dataset: key })
+3740:   })
+3741:     .then(r => r.json())
+3742:     .then(res => {
+3743:       showToast(`✅ Loaded preset dataset: ${key}`);
+3744:       schState.inputRows = [];
+3745:       pollData();
+3746:     });
+3747: }
+3748: 
+3749: function resetCurrentDataset() {
+3750:   const sel = document.getElementById('select-dataset');
+3751:   const key = sel ? sel.value : 'standard';
+3752:   loadPresetDataset(key);
+3753: }
+3754: 
+3755: function updateQuantum(val) {
+3756:   const q = Math.max(1, Math.min(10, parseInt(val) || 2));
+3757:   postAction('set_scheduler_quantum', { quantum: q });
+3758: }
+3759: 
+3760: let wasDeadlocked = false;
+3761: function renderWorkspace3(dl) {
+3762:   if (!dl) return;
+3763:   const twoProc = dl.two_process || {};
+3764:   document.getElementById('txt-deadlock-step-title').innerText = twoProc.title || 'Deadlock Formation';
+3765:   document.getElementById('txt-deadlock-step-desc').innerText = twoProc.explanation || '';
+3766: 
+3767:   const isDeadlocked = twoProc.is_deadlocked;
+3768:   if (isDeadlocked && !wasDeadlocked) {
+3769:     playTone('DEADLOCK');
+3770:   }
+3771:   wasDeadlocked = isDeadlocked;
+3772: 
+3773:   const setEdge = (id, stroke, dashed, isCycle) => {
+3774:     const el = document.getElementById(id);
+3775:     if (el) {
+3776:       el.setAttribute('stroke', stroke);
+3777:       el.setAttribute('stroke-dasharray', dashed ? '3,3' : 'none');
+3778:       if (isCycle && isDeadlocked) el.classList.add('deadlock-cycle-pulse');
+3779:       else el.classList.remove('deadlock-cycle-pulse');
+3780:     }
+3781:   };
+3782: 
+3783:   setEdge('edge-r1-p1', '#334155', false, false);
+3784:   setEdge('edge-r2-p2', '#334155', false, false);
+3785:   setEdge('edge-p1-r2', '#334155', true, false);
+3786:   setEdge('edge-p2-r1', '#334155', true, false);
+3787: 
+3788:   (twoProc.edges || []).forEach(e => {
+3789:     if (e.from === 'R1' && e.to === 'P1') setEdge('edge-r1-p1', isDeadlocked ? '#ef4444' : '#06b6d4', false, isDeadlocked);
+3790:     if (e.from === 'R2' && e.to === 'P2') setEdge('edge-r2-p2', isDeadlocked ? '#ef4444' : '#06b6d4', false, isDeadlocked);
+3791:     if (e.from === 'P1' && e.to === 'R2') setEdge('edge-p1-r2', isDeadlocked ? '#ef4444' : '#f59e0b', true, isDeadlocked);
+3792:     if (e.from === 'P2' && e.to === 'R1') setEdge('edge-p2-r1', isDeadlocked ? '#ef4444' : '#f59e0b', true, isDeadlocked);
+3793:   });
+3794: 
+3795:   const bData = dl.banker || {};
+3796:   document.getElementById('txt-safe-seq').innerText = bData.safe_sequence || 'None';
+3797:   document.getElementById('txt-banker-trace').innerText = 'Trace: ' + (bData.trace || 'Nominal benchmark safe state.');
+3798: 
+3799:   const tbody = document.getElementById('tbody-banker');
+3800:   if (tbody && bData.allocation) {

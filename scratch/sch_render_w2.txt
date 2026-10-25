@@ -1,0 +1,70 @@
+3271:     card.innerHTML = explanations[fieldKey];
+3272:   }
+3273: }
+3274: 
+3275: function renderWorkspace2(sch, comp) {
+3276:   if (!sch) return;
+3277:   schState.data = sch;
+3278:   schState.comp = comp;
+3279: 
+3280:   // Active Algorithm buttons & Badge
+3281:   const algo = sch.algorithm || 'RR';
+3282:   const q = sch.quantum || 2;
+3283:   const badge = document.getElementById('sch-active-algo-badge');
+3284:   if (badge) badge.innerText = `ALGO: ${algo}` + (algo === 'RR' ? ` (Q=${q})` : '');
+3285: 
+3286:   ['RR', 'FCFS', 'SJF', 'PRIORITY'].forEach(a => {
+3287:     const btn = document.getElementById('btn-algo-' + a);
+3288:     if (btn) btn.className = 'btn btn-sm' + (a === algo ? ' btn-accent' : '');
+3289:   });
+3290: 
+3291:   const qCtrl = document.getElementById('rr-quantum-control');
+3292:   if (qCtrl) qCtrl.style.display = (algo === 'RR') ? 'inline-flex' : 'none';
+3293:   const qInput = document.getElementById('input-rr-quantum');
+3294:   if (qInput) qInput.value = q;
+3295: 
+3296:   // Scorecard
+3297:   document.getElementById('metric-avg-wt').innerText = sch.avg_waiting_time + 't';
+3298:   document.getElementById('metric-avg-tat').innerText = sch.avg_turnaround_time + 't';
+3299:   document.getElementById('metric-avg-rt').innerText = sch.avg_response_time + 't';
+3300:   document.getElementById('metric-context-switches').innerText = sch.context_switches;
+3301: 
+3302:   // Populate process input table if empty
+3303:   if (schState.inputRows.length === 0 && sch.raw_processes) {
+3304:     schState.inputRows = sch.raw_processes.map(p => ({
+3305:       label: p.label || ('P' + p.pid),
+3306:       arrival_time: p.arrival_time,
+3307:       burst_time: p.burst_time,
+3308:       priority: p.priority
+3309:     }));
+3310:     renderInputRows();
+3311:   }
+3312: 
+3313:   // Comparison scorecard
+3314:   if (comp) {
+3315:     const tbody = document.getElementById('tbody-comparison');
+3316:     if (tbody) {
+3317:       tbody.innerHTML = '';
+3318:       Object.keys(comp).forEach(k => {
+3319:         const item = comp[k];
+3320:         const tr = document.createElement('tr');
+3321:         tr.style.borderBottom = '1px solid #1e293b';
+3322:         tr.innerHTML = `<td style="padding:4px 8px;"><b>${item.algorithm}</b></td><td style="padding:4px 8px;">${item.avg_waiting_time}t</td><td style="padding:4px 8px;">${item.avg_turnaround_time}t</td><td style="padding:4px 8px;">${item.avg_response_time}t</td><td style="padding:4px 8px; color:var(--accent-purple); font-weight:bold;">${item.context_switches}</td>`;
+3323:         tbody.appendChild(tr);
+3324:       });
+3325:     }
+3326:   }
+3327: 
+3328:   // Clamp tick
+3329:   const maxDuration = sch.total_duration || 12;
+3330:   if (schState.currentTick > maxDuration) schState.currentTick = maxDuration;
+3331:   document.getElementById('gantt-duration-info').innerText = `Total Duration: ${maxDuration} ticks | Algorithm: ${algo}`;
+3332: 
+3333:   updateSchVisualsAtTick(schState.currentTick);
+3334: }
+3335: 
+3336: function updateSchVisualsAtTick(tick) {
+3337:   const sch = schState.data;
+3338:   if (!sch) return;
+3339:   const maxDuration = sch.total_duration || 12;
+3340:   tick = Math.max(0, Math.min(maxDuration, tick));

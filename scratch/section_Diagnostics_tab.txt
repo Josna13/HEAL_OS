@@ -1,0 +1,150 @@
+1647: <div id="tab-diagnostics" style="display: none;">
+1648:   <!-- Diagnostics Internal Sub-navigation -->
+1649:   <div class="diag-subnav">
+1650:     <button class="diag-subbtn active" id="diag-btn-pred" onclick="switchDiagSubtab('pred')">1. AI Failure Prediction</button>
+1651:     <button class="diag-subbtn" id="diag-btn-health" onclick="switchDiagSubtab('health')">2. System Health Decomposition</button>
+1652:     <button class="diag-subbtn" id="diag-btn-topo" onclick="switchDiagSubtab('topo')">3. Subsystem Dependency Map</button>
+1653:     <button class="diag-subbtn" id="diag-btn-policy" onclick="switchDiagSubtab('policy')">4. MAPE-K Decision Policy</button>
+1654:     <button class="diag-subbtn" id="diag-btn-trace" onclick="switchDiagSubtab('trace')">5. Full Synchronized Event Trace</button>
+1655:   </div>
+1656: 
+1657:   <!-- Sub-tab 1: AI Failure Prediction (Panel 3) -->
+1658:   <div id="diag-view-pred">
+1659:     <div class="panel-card">
+1660:       <div class="panel-top">
+1661:         <span class="panel-title">Machine Learning Failure Prediction & Warning Signals</span>
+1662:         <span class="badge badge-live">[RANDOMFOREST ONLINE]</span>
+1663:       </div>
+1664:       <div style="display:grid; grid-template-columns: 240px 1fr; gap:14px; align-items:center;">
+1665:         <!-- Normalized Risk Gauge -->
+1666:         <div style="text-align:center; background:#020617; border:1px solid #1e293b; border-radius:8px; padding:14px;">
+1667:           <div style="font-size:0.72rem; color:var(--text-muted); font-weight:bold; margin-bottom:6px;">ESTIMATED FAILURE RISK</div>
+1668:           <svg width="120" height="120" viewBox="0 0 120 120" style="margin:0 auto;">
+1669:             <circle cx="60" cy="60" r="48" fill="none" stroke="#1e293b" stroke-width="10"/>
+1670:             <circle id="gauge-risk-fill" cx="60" cy="60" r="48" fill="none" stroke="#10b981" stroke-width="10" stroke-dasharray="301.6" stroke-dashoffset="277.5" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+1671:             <text x="60" y="64" fill="#fff" font-size="16" font-weight="900" font-family="monospace" text-anchor="middle" id="gauge-risk-txt">8.0%</text>
+1672:           </svg>
+1673:           <div style="margin-top:8px;">
+1674:             <span class="badge badge-success" id="p3-risk-cat">LOW (8.0%)</span>
+1675:           </div>
+1676:         </div>
+1677: 
+1678:         <!-- Warning Signals Checklist & Recommendation -->
+1679:         <div>
+1680:           <div class="prop-row"><span class="label">Inference Model:</span><span class="val" id="p3-model-status">RandomForest (Supervised)</span></div>
+1681:           <div class="prop-row"><span class="label">Telemetry Features:</span><span class="val">CPU%, RAM%, Disk%, Delta CPU, Delta RAM</span></div>
+1682:           <div class="prop-row"><span class="label">Prediction Timestamp:</span><span class="val" id="p3-pred-time">-</span></div>
+1683:           <div style="font-weight:700; font-size:0.75rem; color:#94a3b8; margin:8px 0 4px 0;">ACTIVE WARNING SIGNALS:</div>
+1684:           <div id="p3-signals-list" style="background:#020617; border:1px solid #1e293b; border-radius:6px; padding:8px; font-size:0.74rem;">
+1685:             <div style="color:#10b981;">✓ All telemetry within safe operating boundaries.</div>
+1686:           </div>
+1687:           <div style="background:#0f172a; border-left:3px solid var(--accent-cyan); padding:6px 10px; border-radius:4px; font-size:0.74rem; color:#cbd5e1; margin-top:8px;" id="p3-recommendation">
+1688:             Recommendation: Operating metrics nominal. Surveillance active.
+1689:           </div>
+1690:         </div>
+1691:       </div>
+1692:     </div>
+1693:   </div>
+1694: 
+1695:   <!-- Sub-tab 2: System Health Decomposition (Panel 4) -->
+1696:   <div id="diag-view-health" style="display:none;">
+1697:     <div class="panel-card">
+1698:       <div class="panel-top">
+1699:         <span class="panel-title">Autonomic System Health Analyzer & Metric Decomposition</span>
+1700:         <span class="badge badge-success" id="p4-health-cat">OPTIMAL</span>
+1701:       </div>
+1702:       <div style="display:grid; grid-template-columns: 240px 1fr; gap:14px; align-items:center;">
+1703:         <!-- Health Score Gauge -->
+1704:         <div style="text-align:center; background:#020617; border:1px solid #1e293b; border-radius:8px; padding:14px;">
+1705:           <div style="font-size:0.72rem; color:var(--text-muted); font-weight:bold; margin-bottom:6px;">HEALTH SCORE</div>
+1706:           <svg width="120" height="120" viewBox="0 0 120 120" style="margin:0 auto;">
+1707:             <circle cx="60" cy="60" r="48" fill="none" stroke="#1e293b" stroke-width="10"/>
+1708:             <circle id="gauge-health-fill" cx="60" cy="60" r="48" fill="none" stroke="#10b981" stroke-width="10" stroke-dasharray="301.6" stroke-dashoffset="6.0" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+1709:             <text x="60" y="64" fill="#fff" font-size="16" font-weight="900" font-family="monospace" text-anchor="middle" id="gauge-health-txt">98/100</text>
+1710:           </svg>
+1711:           <div class="prop-row" style="margin-top:8px;"><span class="label">Stability:</span><span class="val" id="p4-stability" style="color:#10b981;">99%</span></div>
+1712:         </div>
+1713: 
+1714:         <!-- Component Health Bars -->
+1715:         <div>
+1716:           <div style="margin-bottom:8px;">
+1717:             <div style="display:flex; justify-content:space-between; font-size:0.74rem; margin-bottom:2px;"><span style="color:var(--text-muted);">CPU Health Score</span><span style="font-weight:bold;" id="txt-h-cpu">96/100</span></div>
+1718:             <div class="threshold-track"><div id="bar-h-cpu-ind" style="width:96%; height:100%; background:#10b981; transition:width 0.3s;"></div></div>
+1719:           </div>
+1720:           <div style="margin-bottom:8px;">
+1721:             <div style="display:flex; justify-content:space-between; font-size:0.74rem; margin-bottom:2px;"><span style="color:var(--text-muted);">RAM Health Score</span><span style="font-weight:bold;" id="txt-h-ram">98/100</span></div>
+1722:             <div class="threshold-track"><div id="bar-h-ram-ind" style="width:98%; height:100%; background:#10b981; transition:width 0.3s;"></div></div>
+1723:           </div>
+1724:           <div style="margin-bottom:8px;">
+1725:             <div style="display:flex; justify-content:space-between; font-size:0.74rem; margin-bottom:2px;"><span style="color:var(--text-muted);">Disk Health Score</span><span style="font-weight:bold;" id="txt-h-disk">100/100</span></div>
+1726:             <div class="threshold-track"><div id="bar-h-disk-ind" style="width:100%; height:100%; background:#10b981; transition:width 0.3s;"></div></div>
+1727:           </div>
+1728:           <div style="margin-bottom:8px;">
+1729:             <div style="display:flex; justify-content:space-between; font-size:0.74rem; margin-bottom:2px;"><span style="color:var(--text-muted);">Process Stability Score</span><span style="font-weight:bold;" id="txt-h-stab">99/100</span></div>
+1730:             <div class="threshold-track"><div id="bar-h-stab-ind" style="width:99%; height:100%; background:#10b981; transition:width 0.3s;"></div></div>
+1731:           </div>
+1732:           <div class="prop-row"><span class="label">Primary Degraded Component:</span><span class="val" id="p4-degraded-metric">None (All Nominal)</span></div>
+1733:           <div style="background:#0f172a; border-left:3px solid var(--accent-green); padding:6px 10px; border-radius:4px; font-size:0.74rem; color:#cbd5e1; margin-top:6px;" id="p4-recommendation">
+1734:             Recommendation: System operating nominally.
+1735:           </div>
+1736:         </div>
+1737:       </div>
+1738:     </div>
+1739:   </div>
+1740: 
+1741:   <!-- Sub-tab 3: Subsystem Topology Graph (Panel 7) -->
+1742:   <div id="diag-view-topo" style="display:none;">
+1743:     <div class="panel-card">
+1744:       <div class="panel-top">
+1745:         <span class="panel-title">Subsystem Dependency Topology Graph (Click node to inspect)</span>
+1746:         <span class="badge badge-live">[8 MODULES ONLINE]</span>
+1747:       </div>
+1748:       <div class="svg-box">
+1749:         <svg id="svg-topology" width="700" height="180" viewBox="0 0 700 180">
+1750:           <g class="topo-node" id="node-System-Monitor" onclick="inspectModule('System Monitor')"><rect x="20" y="30" width="130" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="85" y="55" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">System Monitor</text></g>
+1751:           <g class="topo-node" id="node-Process-Monitor" onclick="inspectModule('Process Monitor')"><rect x="20" y="100" width="130" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="85" y="125" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">Process Monitor</text></g>
+1752:           <g class="topo-node" id="node-AI-Predictor" onclick="inspectModule('AI Predictor')"><rect x="190" y="30" width="120" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="250" y="55" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">AI Predictor</text></g>
+1753:           <g class="topo-node" id="node-Health-Analyzer" onclick="inspectModule('Health Analyzer')"><rect x="190" y="100" width="120" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="250" y="125" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">Health Analyzer</text></g>
+1754:           <g class="topo-node" id="node-Crash-Detector" onclick="inspectModule('Crash Detector')"><rect x="350" y="30" width="120" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="410" y="55" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">Crash Detector</text></g>
+1755:           <g class="topo-node" id="node-Decision-Engine" onclick="inspectModule('Decision Engine')"><rect x="350" y="100" width="120" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/><text x="410" y="125" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">Decision Engine</text></g>
+1756:           <g class="topo-node" id="node-Recovery-Daemon" onclick="inspectModule('Recovery Daemon')"><rect x="510" y="65" width="130" height="40" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="2"/><text x="575" y="90" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">Recovery Daemon</text></g>
+1757:           <line x1="150" y1="50" x2="190" y2="50" stroke="#475569" stroke-width="2"/>
+1758:           <line x1="150" y1="120" x2="190" y2="120" stroke="#475569" stroke-width="2"/>
+1759:           <line x1="310" y1="50" x2="350" y2="50" stroke="#475569" stroke-width="2"/>
+1760:           <line x1="310" y1="120" x2="350" y2="120" stroke="#475569" stroke-width="2"/>
+1761:           <line x1="470" y1="50" x2="510" y2="85" stroke="#475569" stroke-width="2"/>
+1762:           <line x1="470" y1="120" x2="510" y2="85" stroke="#475569" stroke-width="2"/>
+1763:         </svg>
+1764:       </div>
+1765:       <div id="topo-inspect-box" style="background:#020617; border:1px solid #1e293b; border-radius:6px; padding:8px 12px; font-size:0.75rem; margin-top:8px;">
+1766:         Click any subsystem node above to inspect its real-time operational status and dependencies.
+1767:       </div>
+1768:     </div>
+1769:   </div>
+1770: 
+1771:   <!-- Sub-tab 4: MAPE-K Decision Policy Engine (Panel 6) -->
+1772:   <div id="diag-view-policy" style="display:none;">
+1773:     <div class="panel-card">
+1774:       <div class="panel-top">
+1775:         <span class="panel-title">MAPE-K Decision Policy Engine & Rule Evaluation</span>
+1776:         <span class="badge badge-live">[POLICY ACTIVE]</span>
+1777:       </div>
+1778:       <div class="prop-row"><span class="label">Current Action:</span><span class="val" id="p6-action" style="color:var(--accent-cyan);">RESTART_APPLICATION</span></div>
+1779:       <div class="prop-row"><span class="label">Decision Score:</span><span class="val" id="p6-score">100.0%</span></div>
+1780:       <div class="prop-row"><span class="label">Rationale:</span><span class="val" id="p6-reason">Host OS health score optimal; restart policy nominal</span></div>
+1781:       <div style="font-weight:700; font-size:0.75rem; color:#94a3b8; margin:8px 0 4px 0;">POLICY RULE EVALUATION HIERARCHY:</div>
+1782:       <div id="p6-rules-list" style="background:#020617; border:1px solid #1e293b; border-radius:6px; padding:8px; font-size:0.74rem;">
+1783:         <div>Rule 1: If health &ge; 70 and not crash storm &rarr; <b style="color:#10b981;">RESTART_APPLICATION</b> (Selected)</div>
+1784:       </div>
+1785:     </div>
+1786:   </div>
+1787: 
+1788:   <!-- Sub-tab 5: Full Synchronized Event Trace -->
+1789:   <div id="diag-view-trace" style="display:none;">
+1790:     <div class="panel-card">
+1791:       <div class="panel-top">
+1792:         <span class="panel-title">Full Synchronized Event History & Forensic Audit Log</span>
+1793:         <div style="display:flex; gap:4px;">
+1794:           <button class="btn btn-sm" onclick="filterTrace('ALL')">ALL</button>
+1795:           <button class="btn btn-sm" onclick="filterTrace('[LIVE DATA]')">[LIVE DATA]</button>
+1796:           <button class="btn btn-sm" onclick="filterTrace('[SIMULATION]')">[SIMULATION]</button>
