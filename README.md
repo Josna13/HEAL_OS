@@ -46,7 +46,7 @@ HealOS 2.0 implements the classic IBM **MAPE-K** (Monitor, Analyze, Plan, Execut
 
 ---
 
-## 2. Teacher Demonstration Checklist (20 Required Features)
+## 2.  Demonstration Checklist (20 Required Features)
 
 | # | Feature | Implementation File | Verification Command / Action | Expected Result |
 | :---: | :--- | :--- | :--- | :--- |
